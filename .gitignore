@@ -1,0 +1,22 @@
+# Build output
+target/
+
+# IDEs
+.idea/
+*.iml
+out/
+.vscode/
+
+# Logs & crash dumps
+*.log
+hs_err_pid*
+replay_pid*.hprof
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Local env files
+.env
+*.env
+*.local
