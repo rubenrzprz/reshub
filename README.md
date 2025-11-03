@@ -1,22 +1,86 @@
 # ResHub — Hotel Reservation API (Spring Boot)
 
-Secure, multi-tenant reservation API with **JWT + RBAC**, search (pagination/filters), and CSV/JSON exports.  
-Status: **WIP**
+[![CI (Build & Test)](https://github.com/rubenrzprz/reshub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rubenrzprz/reshub/actions/workflows/ci.yml)
 
-## Why
-Showcase delivering a real, secure backend with clear domain boundaries and tests.
+**Status:** WIP 🛠️
 
-## Tech (planned)
-Java 21 · Spring Boot 3 · Maven · PostgreSQL · Docker · Testcontainers
+Secure, multi-tenant reservation API demonstrating **JWT + RBAC**, robust search (pagination/filters), and **CSV/JSON** exports. Built for clarity, testability, and easy demo.
 
-## Roadmap (short)
-- [ ] Bootstrap Spring Boot app
-- [ ] Add CI (Maven + Java 21)
-- [ ] DB (PostgreSQL) + Flyway
-- [ ] Auth (JWT) + Roles (MANAGER, RECEPTIONIST, AGENCY)
-- [ ] Reservations CRUD + search + exports
-- [ ] Integration tests (Testcontainers)
+---
 
-## Notes
-- UI: **Swagger-first**
-- Deletion policy: **never delete, only cancel**
+## 📚 Table of Contents
+- [🧭 Overview](#-overview)
+- [✨ Features](#-features)
+- [🧰 Tech Stack](#-tech-stack)
+- [🚀 Run & Explore](#-run--explore)
+- [🗺️ Milestones](#-milestones)
+- [✍️ Author](#-author)
+
+---
+
+## 🧭 Overview
+ResHub showcases a production-style backend: authenticated operations, role-based permissions, clean error design, and repeatable local/CI runs.
+
+---
+
+## ✨ Features
+- 🔐 JWT login with roles: **MANAGER**, **RECEPTIONIST**, **AGENCY**
+- 🔎 Search by date range, status, and free-text guest; pagination & sorting
+- 📤 CSV/JSON export of filtered results
+- 🧭 Idempotent `externalRef` per (hotel, agency)
+- ✅ Integration tests with **Testcontainers (Postgres)**
+
+---
+
+## 🧰 Tech Stack
+| 🧩 **Area**       | ⚙️ **Choice**                             |
+|-------------------|-------------------------------------------|
+| 💬 **Language**   | Java 21                                   |
+| 🧱 **Framework**  | Spring Boot 3                             |
+| 🧷 **Build**      | Maven                                     |
+| 🗄️ **Database**  | PostgreSQL 16                             |
+| 🔁 **Migrations** | Flyway                                    |
+| 🧪 **Testing**    | JUnit 5, Spring Boot Test, Testcontainers |
+| 📚 **API Docs**   | OpenAPI (springdoc)                       |
+| ▶️ **Runtime**    | Docker / Docker Compose                   |
+
+---
+
+## 🚀 Run & Explore
+Clone the repository and start the service locally.
+
+```bash
+git clone https://github.com/rubenrzprz/reshub.git
+cd reshub
+
+# build
+mvn -q -DskipTests package
+
+# run
+mvn spring-boot:run
+````
+
+* Base URL: **[http://localhost:8080](http://localhost:8080)**
+* API Documentation (Swagger UI): **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
+
+> The server port can be configured in `src/main/resources/application.yml`.
+
+---
+
+## 🗺️ Milestones
+
+* [x] Bootstrap application with `/health` and Swagger UI
+* [x] CI for PRs and `main` (build + tests)
+* [ ] Database baseline (PostgreSQL + Flyway)
+* [ ] Auth (JWT) + Roles enforcement
+* [ ] Reservations CRUD + search + exports
+* [ ] Integration tests (Testcontainers)
+
+---
+
+## ✍️ Author
+
+**Ruben R.P.** — Backend Developer
+
+- GitHub: 👤[https://github.com/rubenrzprz](https://github.com/rubenrzprz)
+- LinkedIn: 💼[https://www.linkedin.com/in/ruben-rp/](https://www.linkedin.com/in/ruben-rp/)
