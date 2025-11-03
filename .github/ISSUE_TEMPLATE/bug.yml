@@ -1,0 +1,101 @@
+name: Bug report
+description: Something isn’t working as expected
+title: "[Bug] "
+labels: [bug]
+
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence — what’s broken and where?
+      placeholder: e.g., Export CSV returns 500 in Docker Compose
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - S1 Blocker (no workaround)
+        - S2 Major (workaround exists)
+        - S3 Minor
+        - S4 Trivial
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Version/commit, branch, runtime (Maven/Docker/CI), OS/Java.
+      placeholder: |
+        Version/Commit: v0.1.0 (sha abc1234)
+        Branch: main
+        Runtime: Docker Compose
+        OS/Java: macOS 14, Java 21
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Numbered list.
+      placeholder: |
+        1) Start with docker compose up
+        2) Call GET /reservations/export.csv
+        3) Observe 500 error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      placeholder: e.g., 200 OK with CSV payload
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: Paste key error lines or response body.
+      placeholder: |
+        HTTP 500
+        {"type":"...","title":"Internal Server Error","detail":"..."}
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options: [Always, Often, Intermittent, Once]
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround (optional)
+      placeholder: e.g., Retry with JSON export works
+
+  - type: input
+    id: related
+    attributes:
+      label: Related
+      placeholder: "Refs #123, PR #456, logs/screenshot links"
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Same steps now pass (fixed behavior)
+        - label: Regression test added/updated
+        - label: CI green
+        - label: OpenAPI/README updated if user-facing
+        - label: Root cause noted (1–2 lines)

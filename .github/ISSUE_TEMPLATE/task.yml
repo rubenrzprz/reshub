@@ -1,0 +1,83 @@
+name: Task
+description: Plan a small, reviewable piece of work
+title: "[Task] "
+labels: []
+
+body:
+  - type: input
+    id: goal
+    attributes:
+      label: Goal
+      description: 1–2 sentences describing the desired outcome and why now.
+      placeholder: e.g., Bootstrap Spring Boot app with /health
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Boundaries for this task (what’s in vs out).
+      placeholder: |
+        In:
+        - ...
+        Out:
+        - ...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Keep it short; split into another task if it grows.
+      options:
+        - label: Step 1 — …
+        - label: Step 2 — …
+        - label: Step 3 — …
+
+  - type: textarea
+    id: verify
+    attributes:
+      label: How to Verify (manual)
+      description: Exact steps or curl/Postman calls to confirm it works.
+      placeholder: |
+        1) Run: mvn spring-boot:run
+        2) GET http://localhost:8080/health → 200 "ResHub OK"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Outcome validated via “How to Verify”
+        - label: Tests added/updated
+        - label: CI checks green on PR
+        - label: OpenAPI updated (if API changed)
+        - label: README/Architecture.md updated if needed
+        - label: Approved & merged into main
+
+  - type: input
+    id: related
+    attributes:
+      label: Related
+      placeholder: Refs #123, PR #456, docs link
+
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimate
+      options:
+        - XS (≤30m)
+        - S (≤2h)
+        - M (≤1 day)
+        - L (1–2 days)
+        - XL (>2 days)
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (optional)
+      placeholder: Assumptions, risks, or follow-ups.
