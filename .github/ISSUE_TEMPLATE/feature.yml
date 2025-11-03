@@ -1,0 +1,125 @@
+name: Feature
+description: Propose and plan a new capability
+title: "[Feature] "
+labels: []
+
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence—what are we adding and why now?
+      placeholder: e.g., Add reservations CSV/JSON export with filters
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User Story
+      description: Write the feature from the user's perspective.
+      placeholder: "As a <role>, I want <capability> so that <benefit>."
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / Value
+      description: Why this matters (business/portfolio signal, developer UX, correctness).
+      placeholder: Bullet points of the value this unlocks
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Boundaries for this feature (what’s in vs out).
+      placeholder: |
+        In:
+        - ...
+        Out:
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Concrete, testable outcomes (Gherkin-style if helpful).
+      placeholder: |
+        - When X, then Y
+        - Given A, when B, then C
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Keep it short; split if it grows too large.
+      options:
+        - label: Step 1 — …
+        - label: Step 2 — …
+        - label: Step 3 — …
+
+  - type: textarea
+    id: verify
+    attributes:
+      label: How to Verify (manual)
+      description: Exact steps or curl/Postman calls a reviewer can run.
+      placeholder: |
+        1) Run app (docker compose up)
+        2) Call GET /... with params ...
+        3) Expect 200 with ...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: design_impacts
+    attributes:
+      label: Design / Contract Impacts
+      description: Mark any applicable impacts for visibility.
+      options:
+        - label: API contract changes (OpenAPI updates required)
+        - label: Security/auth changes (roles/permissions)
+        - label: Data model/migration changes (Flyway)
+        - label: Breaking change for existing clients
+
+  - type: input
+    id: related
+    attributes:
+      label: Related
+      description: Link related tasks, bugs, PRs, or docs
+      placeholder: "Refs #123, PR #456, doc link"
+
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimate
+      options:
+        - XS (≤30m)
+        - S (≤2h)
+        - M (≤1 day)
+        - L (1–2 days)
+        - XL (>2 days)
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (optional)
+      placeholder: Assumptions, risks, alternatives considered.
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Acceptance criteria met
+        - label: Tests added/updated (unit/integration as appropriate)
+        - label: CI checks green on PR
+        - label: OpenAPI updated (if API changed)
+        - label: README/Architecture.md updated if needed
+        - label: Approved & merged into main
