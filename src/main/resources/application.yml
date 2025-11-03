@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: reshub
+
+server:
+  port: 8080
