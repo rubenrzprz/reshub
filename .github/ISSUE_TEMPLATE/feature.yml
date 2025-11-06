@@ -55,15 +55,19 @@ body:
     validations:
       required: true
 
-  - type: checkboxes
+  - type: textarea
     id: tasks
     attributes:
-      label: Tasks
+      label: Tasks (editable checklist)
       description: Keep it short; split if it grows too large.
-      options:
-        - label: Step 1 — …
-        - label: Step 2 — …
-        - label: Step 3 — …
+      placeholder: |
+        - [ ] Repo query with filters
+        - [ ] CSV/JSON streaming
+        - [ ] OpenAPI examples
+        - [ ] Integration tests
+      render: markdown
+    validations:
+      required: true
 
   - type: textarea
     id: verify

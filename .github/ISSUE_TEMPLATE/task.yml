@@ -25,16 +25,18 @@ body:
         - ...
     validations:
       required: true
-
-  - type: checkboxes
+  - type: textarea
     id: tasks
     attributes:
       label: Tasks
-      description: Keep it short; split into another task if it grows.
-      options:
-        - label: Step 1 — …
-        - label: Step 2 — …
-        - label: Step 3 — …
+      description: Keep it short; split if it grows too large.
+      placeholder: |
+        - [ ] Step 1 — ...
+        - [ ] Step 2 — ...
+        - [ ] Step 3 — ...
+      render: markdown
+    validations:
+      required: true
 
   - type: textarea
     id: verify
