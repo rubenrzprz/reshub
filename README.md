@@ -13,6 +13,8 @@ Secure, multi-tenant reservation API demonstrating **JWT + RBAC**, robust search
 - [✨ Features](#-features)
 - [🧰 Tech Stack](#-tech-stack)
 - [🚀 Run & Explore](#-run--explore)
+  - [🧪 Run locally (Maven)](#-run-locally-maven)
+  - [🐳 Run in Docker](#-run-in-docker)
 - [🗺️ Milestones](#-milestones)
 - [✍️ Author](#-author)
 
@@ -47,6 +49,8 @@ ResHub showcases a production-style backend: authenticated operations, role-base
 ---
 
 ## 🚀 Run & Explore
+
+### 🧪 Run locally (Maven)
 Clone the repository and start the service locally.
 
 ```bash
@@ -61,9 +65,30 @@ mvn spring-boot:run
 ````
 
 * Base URL: **[http://localhost:8080](http://localhost:8080)**
-* API Documentation (Swagger UI): **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
+* Swagger UI: **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
 
 > The server port can be configured in `src/main/resources/application.yml`.
+
+### 🐳 Run in Docker
+
+Build and run the containerized app.
+
+```bash
+# build image
+docker build -t reshub:dev .
+
+# run container
+docker run --rm -p 8080:8080 reshub:dev
+```
+
+**Verify**
+
+* Health: [http://localhost:8080/health](http://localhost:8080/health) → **200** with `ResHub OK`
+* Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+
+**Notes**
+
+* If port **8080** is busy, map another host port, e.g. `-p 8081:8080`.
 
 ---
 
@@ -82,5 +107,7 @@ mvn spring-boot:run
 
 **Ruben R.P.** — Backend Developer
 
-- GitHub: 👤[https://github.com/rubenrzprz](https://github.com/rubenrzprz)
-- LinkedIn: 💼[https://www.linkedin.com/in/ruben-rp/](https://www.linkedin.com/in/ruben-rp/)
+* GitHub: 👤 [https://github.com/rubenrzprz](https://github.com/rubenrzprz)
+* LinkedIn: 💼 [https://www.linkedin.com/in/ruben-rp/](https://www.linkedin.com/in/ruben-rp/)
+
+```
