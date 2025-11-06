@@ -65,7 +65,6 @@ body:
         - [ ] CSV/JSON streaming
         - [ ] OpenAPI examples
         - [ ] Integration tests
-      render: markdown
     validations:
       required: true
 
