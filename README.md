@@ -14,7 +14,7 @@ Secure, multi-tenant reservation API demonstrating **JWT + RBAC**, robust search
 - [🧰 Tech Stack](#-tech-stack)
 - [🚀 Run & Explore](#-run--explore)
   - [🧪 Run locally (Maven)](#-run-locally-maven)
-  - [🐳 Run in Docker](#-run-in-docker)
+  - [🐳 Run with Docker Compose (API only)](#-run-with-docker-compose-api-only)
 - [🗺️ Milestones](#-milestones)
 - [✍️ Author](#-author)
 
@@ -69,26 +69,29 @@ mvn spring-boot:run
 
 > The server port can be configured in `src/main/resources/application.yml`.
 
-### 🐳 Run in Docker
+### 🐳 Run with Docker Compose (API only)
+One command to build and run the API container.
 
-Build and run the containerized app.
+1) Copy environment defaults:
+```bash
+cp .env.example .env
+````
+
+2) Build & start:
 
 ```bash
-# build image
-docker build -t reshub:dev .
-
-# run container
-docker run --rm -p 8080:8080 reshub:dev
+docker compose up --build
 ```
 
-**Verify**
+3) Verify:
 
-* Health: [http://localhost:8080/health](http://localhost:8080/health) → **200** with `ResHub OK`
+* Health: [http://localhost:8080/health](http://localhost:8080/health) → **200** `ResHub OK`
 * Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 
 **Notes**
 
-* If port **8080** is busy, map another host port, e.g. `-p 8081:8080`.
+* If port 8080 is busy, set `APP_PORT=8081` in `.env` and re-run.
+* Stop with `Ctrl + C` (foreground) or `docker compose down` (background).
 
 ---
 
