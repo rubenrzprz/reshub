@@ -12,6 +12,7 @@ Secure, multi-tenant reservation API demonstrating **JWT + RBAC**, robust search
 - [🧭 Overview](#-overview)
 - [✨ Features](#-features)
 - [🧰 Tech Stack](#-tech-stack)
+- [📐 Architecture](#-architecture)
 - [🚀 Run & Explore](#-run--explore)
   - [🧪 Run locally (Maven)](#-run-locally-maven)
   - [🐳 Run with Docker Compose (API only)](#-run-with-docker-compose-api-only)
@@ -22,6 +23,7 @@ Secure, multi-tenant reservation API demonstrating **JWT + RBAC**, robust search
 
 ## 🧭 Overview
 ResHub showcases a production-style backend: authenticated operations, role-based permissions, clean error design, and repeatable local/CI runs.
+See the full domain & data model in **[📐 Architecture](docs/Architecture.md)**.
 
 ---
 
@@ -45,6 +47,19 @@ ResHub showcases a production-style backend: authenticated operations, role-base
 | 🧪 **Testing**    | JUnit 5, Spring Boot Test, Testcontainers |
 | 📚 **API Docs**   | OpenAPI (springdoc)                       |
 | ▶️ **Runtime**    | Docker / Docker Compose                   |
+
+---
+
+## 📐 Architecture
+
+High-level overview of the domain & data model. For the full spec, see **[docs/Architecture.md](docs/Architecture.md)**.
+
+- **Tenancy:** single DB; entities scoped by `hotel_id` where applicable.
+- **Core entities:** `hotel`, `agency`, `app_user`, `room_type`, `room_type_channel_map`, `reservation`, `reservation_comment`.
+- **Reservations:** lifecycle `NEW → CONFIRMED → CANCELLED | NOSHOW`; never delete (use status + `cancelled_at`).
+- **Idempotency:** unique `(hotel_id, agency_id, external_ref)`.
+- **Room types:** hotel-scoped with `attributes_raw` + `attributes_canonical` (JSONB), GIN index; channel mapping; **late binding**.
+- **Migrations:** V1 (baseline) → V2 (room modeling) → V3 (reservations/comments) → V4 (agency authorization, flag-gated).
 
 ---
 
