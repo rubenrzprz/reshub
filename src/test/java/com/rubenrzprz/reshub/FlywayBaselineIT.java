@@ -45,12 +45,41 @@ class FlywayBaselineIT {
     Assertions.assertEquals(1, appUser);
   }
 
+  @Test
+  void v1ConstraintsAndIndexesExist() {
+    Assertions.assertEquals(1, constraintExists("app_user_affiliation_xor"));
+    Assertions.assertEquals(1, indexExists("app_user", "idx_app_user_hotel"));
+    Assertions.assertEquals(1, indexExists("app_user", "idx_app_user_agency"));
+  }
+
   private int exists(String table) {
     Integer count = jdbc.queryForObject(
       "select count(*) from information_schema.tables " +
         "where table_schema='public' and table_name = ?",
       Integer.class,
       table
+    );
+    Assertions.assertNotNull(count);
+    return count;
+  }
+
+  private int constraintExists(String constraint) {
+    Integer count = jdbc.queryForObject(
+      "select count(*) from pg_constraint where conname = ?",
+      Integer.class,
+      constraint
+    );
+    Assertions.assertNotNull(count);
+    return count;
+  }
+
+  private int indexExists(String table, String index) {
+    Integer count = jdbc.queryForObject(
+      "select count(*) from pg_indexes where schemaname='public' " +
+        "and tablename = ? and indexname = ?",
+      Integer.class,
+      table,
+      index
     );
     Assertions.assertNotNull(count);
     return count;
