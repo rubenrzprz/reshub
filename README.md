@@ -81,7 +81,7 @@ One command builds and runs the complete development stack:
 
 ```bash
 cp .env.example .env
-````
+```
 
 2. Build & start the stack:
 
@@ -107,7 +107,7 @@ docker compose up --build
 mvn -q test
 ```
 
-* Integration tests use **Testcontainers** to spin up PostgreSQL.
+* Integration tests that hit PostgreSQL use **Testcontainers**.
 * The test suite verifies that the baseline database schema is applied.
 
 ---
@@ -129,5 +129,3 @@ mvn -q test
 
 * GitHub: 👤 [https://github.com/rubenrzprz](https://github.com/rubenrzprz)
 * LinkedIn: 💼 [https://www.linkedin.com/in/ruben-rp/](https://www.linkedin.com/in/ruben-rp/)
-
-```
