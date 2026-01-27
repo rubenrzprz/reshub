@@ -14,8 +14,8 @@ Secure, multi-tenant reservation API demonstrating **JWT + RBAC**, robust search
 - [🧰 Tech Stack](#-tech-stack)
 - [📐 Architecture](#-architecture)
 - [🚀 Run & Explore](#-run--explore)
-  - [🧪 Run locally (Maven)](#-run-locally-maven)
-  - [🐳 Run with Docker Compose (API only)](#-run-with-docker-compose-api-only)
+  - [🐳 Run with Docker Compose (API + DB)](#-run-with-docker-compose-api--db)
+  - [🧪 Tests](#-tests)
 - [🗺️ Milestones](#-milestones)
 - [✍️ Author](#-author)
 
@@ -65,48 +65,50 @@ High-level overview of the domain & data model. For the full spec, see **[docs/A
 
 ## 🚀 Run & Explore
 
-### 🧪 Run locally (Maven)
-Clone the repository and start the service locally.
+ResHub is designed to be run as a **full local stack** using Docker Compose.
+This guarantees the same behavior locally, in CI, and in future environments.
 
-```bash
-git clone https://github.com/rubenrzprz/reshub.git
-cd reshub
+### 🐳 Run with Docker Compose (API + DB)
 
-# build
-mvn -q -DskipTests package
+One command builds and runs the complete development stack:
 
-# run
-mvn spring-boot:run
-````
+- **API** (Spring Boot)
+- **Database** (PostgreSQL + Flyway migrations)
 
-* Base URL: **[http://localhost:8080](http://localhost:8080)**
-* Swagger UI: **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
-
-> The server port can be configured in `src/main/resources/application.yml`.
-
-### 🐳 Run with Docker Compose (API only)
-One command to build and run the API container.
+#### ▶️ Start
 
 1) Copy environment defaults:
+
 ```bash
 cp .env.example .env
 ````
 
-2) Build & start:
+2. Build & start the stack:
 
 ```bash
 docker compose up --build
 ```
 
-3) Verify:
+3. Verify:
 
-* Health: [http://localhost:8080/health](http://localhost:8080/health) → **200** `ResHub OK`
-* Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+* Health: **[http://localhost:8080/health](http://localhost:8080/health)** → `200`
+* Swagger UI: **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
 
-**Notes**
+#### 📌 Notes
 
-* If port 8080 is busy, set `APP_PORT=8081` in `.env` and re-run.
-* Stop with `Ctrl + C` (foreground) or `docker compose down` (background).
+* On startup, **Flyway automatically applies database migrations**.
+* The API runs with the `dev` profile when started via Docker Compose.
+* If port `8080` is busy, set `APP_PORT=8081` in `.env` and re-run.
+* Stop with `Ctrl + C` (foreground) or `docker compose down`.
+
+### 🧪 Tests
+
+```bash
+mvn -q test
+```
+
+* Integration tests use **Testcontainers** to spin up PostgreSQL.
+* The test suite verifies that the baseline database schema is applied.
 
 ---
 
@@ -114,7 +116,7 @@ docker compose up --build
 
 * [x] Bootstrap application with `/health` and Swagger UI
 * [x] CI for PRs and `main` (build + tests)
-* [ ] Database baseline (PostgreSQL + Flyway)
+* [x] Database baseline (PostgreSQL + Flyway)
 * [ ] Auth (JWT) + Roles enforcement
 * [ ] Reservations CRUD + search + exports
 * [ ] Integration tests (Testcontainers)
