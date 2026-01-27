@@ -1,16 +1,22 @@
 package com.rubenrzprz.reshub.health;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class HealthApiTest {
+@TestPropertySource(properties = {
+  "spring.application.name=reshub-test",
+  "spring.autoconfigure.exclude="
+    + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
+    + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
+    + "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
+})
+class HealthApiIT {
 
   @Value("${spring.application.name}")
   String appName;
