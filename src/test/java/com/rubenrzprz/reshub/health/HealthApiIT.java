@@ -10,7 +10,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-class HealthApiTest {
+class HealthApiIT {
 
   @Value("${spring.application.name}")
   String appName;
