@@ -59,7 +59,7 @@ High-level overview of the domain & data model. For the full spec, see **[docs/A
 - **Reservations:** lifecycle `NEW → CONFIRMED → CANCELLED | NOSHOW`; never delete (use status + `cancelled_at`).
 - **Idempotency:** unique `(hotel_id, agency_id, external_ref)`.
 - **Room types:** hotel-scoped with `attributes_raw` + `attributes_canonical` (JSONB), GIN index; channel mapping; **late binding**.
-- **Migrations:** V1 (baseline) → V2 (room modeling) → V3 (reservations/comments) → V4 (agency authorization, flag-gated).
+- **Migrations:** V1 (baseline) → V2 (room modeling) → V3 (room type channel map integrity) → V4 (reservations/comments) → V5 (agency authorization, flag-gated).
 
 ---
 

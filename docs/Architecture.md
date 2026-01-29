@@ -1,6 +1,6 @@
 # 🏗️ ResHub — Architecture (Domain & Data Model)
 
-**Version:** 0.1 (MVP)  
+**Version:** 0.2 (MVP)  
 **Status:** Draft — authoritative design for MVP; kept in sync with migrations
 
 ---
@@ -141,6 +141,7 @@
 
 **Indexes**
 - `UNIQUE (hotel_id, code)`
+- `UNIQUE (hotel_id, id)` *(supports composite FK from room_type_channel_map)*
 - `GIN (attributes_canonical)`
 
 **Canonical JSON (examples)**
@@ -164,8 +165,8 @@
 ### 4.5 🔗 room_type_channel_map
 
 * `id UUID PK`
-* `hotel_id UUID NOT NULL`
-* `room_type_id UUID NOT NULL REFERENCES room_type(id) ON DELETE RESTRICT`
+* `hotel_id UUID NOT NULL REFERENCES hotel(id) ON DELETE RESTRICT`
+* `room_type_id UUID NOT NULL`
 * `channel VARCHAR(32) NOT NULL`  *(or agency code)*
 * `external_code VARCHAR(64) NOT NULL`
 * `external_name VARCHAR(160) NULL`
@@ -175,6 +176,10 @@
 **Indexes**
 
 * `UNIQUE (hotel_id, channel, external_code)`
+
+**Constraints**
+
+* `FOREIGN KEY (hotel_id, room_type_id) REFERENCES room_type(hotel_id, id) ON DELETE RESTRICT`
 
 ---
 
@@ -327,8 +332,9 @@
 
 * **V1 — Baseline**: `hotel`, `agency`, `app_user` (+ constraints/indexes).
 * **V2 — Room modeling**: `room_type`, `room_type_channel_map` (+ GIN index).
-* **V3 — Reservations & comments**: `reservation`, `reservation_comment` (+ constraints/indexes; nullable `room_type_id`; idempotency).
-* **V4 — Agency authorization (feature-flagged)**: `agency_hotel_auth`, `agency_hotel_room_type_allow`.
+* **V3 — Room type channel map integrity**: FK `room_type_channel_map.hotel_id → hotel(id)` and composite FK `(hotel_id, room_type_id) → room_type(hotel_id, id)`.
+* **V4 — Reservations & comments**: `reservation`, `reservation_comment` (+ constraints/indexes; nullable `room_type_id`; idempotency).
+* **V5 — Agency authorization (feature-flagged)**: `agency_hotel_auth`, `agency_hotel_room_type_allow`.
 
 ---
 
@@ -371,4 +377,5 @@
 
 ## 13) 📝 Change Log
 
+* v0.2 — Added room_type_channel_map hotel integrity constraints (V3).
 * v0.1 — Initial MVP model (this document).
