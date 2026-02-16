@@ -88,4 +88,59 @@ public class ReservationController {
     RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
     return reservationCommandService.addComment(id, request.body(), actor);
   }
+
+  @Operation(summary = "Confirm reservation")
+  @ApiResponse(responseCode = "200", description = "Reservation confirmed and authorized")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope")
+  @ApiResponse(responseCode = "404", description = "Reservation not found")
+  @ApiResponse(responseCode = "409", description = "Invalid status transition")
+  @PostMapping("/reservations/{id}/confirm")
+  public ReservationView confirm(
+    @PathVariable UUID id,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    return reservationCommandService.confirm(id, actor);
+  }
+
+  @Operation(summary = "Cancel reservation")
+  @ApiResponse(responseCode = "200", description = "Reservation cancelled and authorized")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope")
+  @ApiResponse(responseCode = "404", description = "Reservation not found")
+  @ApiResponse(responseCode = "409", description = "Invalid status transition")
+  @PostMapping("/reservations/{id}/cancel")
+  public ReservationView cancel(
+    @PathVariable UUID id,
+    @RequestBody(required = false) ReservationCancelRequest request,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    return reservationCommandService.cancel(id, request == null ? null : request.reason(), actor);
+  }
+
+  @Operation(summary = "Mark reservation as no-show")
+  @ApiResponse(responseCode = "200", description = "Reservation marked no-show and authorized")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope")
+  @ApiResponse(responseCode = "404", description = "Reservation not found")
+  @ApiResponse(responseCode = "409", description = "Invalid status transition")
+  @PostMapping("/reservations/{id}/noshow")
+  public ReservationView noShow(
+    @PathVariable UUID id,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    return reservationCommandService.noShow(id, actor);
+  }
 }

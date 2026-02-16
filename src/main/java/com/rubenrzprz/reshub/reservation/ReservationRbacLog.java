@@ -14,11 +14,16 @@ final class ReservationRbacLog {
   static final String EVENT_COMMENT_AUTHORIZED = "reservation.comment.authorized";
   static final String EVENT_COMMENT_FORBIDDEN = "reservation.comment.forbidden";
   static final String EVENT_COMMENT_NOT_FOUND = "reservation.comment.not_found";
+  static final String EVENT_STATUS_AUTHORIZED = "reservation.status.authorized";
+  static final String EVENT_STATUS_FORBIDDEN = "reservation.status.forbidden";
+  static final String EVENT_STATUS_NOT_FOUND = "reservation.status.not_found";
+  static final String EVENT_STATUS_INVALID_TRANSITION = "reservation.status.invalid_transition";
 
   static final String REASON_HOTEL_SCOPE_MISMATCH = "hotel_scope_mismatch";
   static final String REASON_AGENCY_SCOPE_MISMATCH = "agency_scope_mismatch";
   static final String REASON_OWNER_MISMATCH = "owner_mismatch";
   static final String REASON_COMMENTS_INTERNAL_ONLY = "comments_internal_only";
+  static final String REASON_INVALID_TRANSITION = "invalid_transition";
   static final String REASON_UNSUPPORTED_ROLE = "unsupported_role";
 
   private ReservationRbacLog() {

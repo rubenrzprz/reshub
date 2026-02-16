@@ -29,7 +29,7 @@ public class ReservationCommandService {
 
   public ReservationView updateNotes(UUID reservationId, String notes, RequestActor actor) {
     ReservationScope scope = loadScope(reservationId, actor);
-    enforceUpdateAccess(actor, scope);
+    enforceMutationAccess(actor, scope, ReservationRbacLog.EVENT_UPDATE_FORBIDDEN);
 
     jdbc.update("update reservation set notes = ?, updated_at = now() where id = ?", notes, reservationId);
 
@@ -44,6 +44,18 @@ public class ReservationCommandService {
       )
     );
     return reservationQueryService.getById(reservationId, actor);
+  }
+
+  public ReservationView confirm(UUID reservationId, RequestActor actor) {
+    return changeStatus(reservationId, actor, "CONFIRMED", null);
+  }
+
+  public ReservationView cancel(UUID reservationId, String reason, RequestActor actor) {
+    return changeStatus(reservationId, actor, "CANCELLED", reason);
+  }
+
+  public ReservationView noShow(UUID reservationId, RequestActor actor) {
+    return changeStatus(reservationId, actor, "NOSHOW", null);
   }
 
   public ReservationCommentView addComment(UUID reservationId, String body, RequestActor actor) {
@@ -89,12 +101,13 @@ public class ReservationCommandService {
 
   private ReservationScope loadScope(UUID reservationId, RequestActor actor, String notFoundEvent) {
     List<ReservationScope> rows = jdbc.query(
-      "select id, hotel_id, agency_id, created_by_user_id from reservation where id = ?",
+      "select id, hotel_id, agency_id, created_by_user_id, status from reservation where id = ?",
       (rs, rowNum) -> new ReservationScope(
         UUID.fromString(rs.getString("id")),
         UUID.fromString(rs.getString("hotel_id")),
         UUID.fromString(rs.getString("agency_id")),
-        UUID.fromString(rs.getString("created_by_user_id"))
+        UUID.fromString(rs.getString("created_by_user_id")),
+        rs.getString("status")
       ),
       reservationId
     );
@@ -119,8 +132,8 @@ public class ReservationCommandService {
     return loadScope(reservationId, actor, ReservationRbacLog.EVENT_UPDATE_NOT_FOUND);
   }
 
-  private void enforceUpdateAccess(RequestActor actor, ReservationScope scope) {
-    Consumer<String> onDeny = reason -> deny(actor, scope.id(), reason);
+  private void enforceMutationAccess(RequestActor actor, ReservationScope scope, String forbiddenEvent) {
+    Consumer<String> onDeny = reason -> deny(actor, scope.id(), forbiddenEvent, reason);
     switch (actor.role()) {
       case MANAGER -> ReservationRbacGuards.requireHotelScope(actor, scope.hotelId(), onDeny);
       case RECEPTIONIST -> {
@@ -163,6 +176,62 @@ public class ReservationCommandService {
     return timestamp == null ? null : timestamp.toInstant().atOffset(ZoneOffset.UTC);
   }
 
-  private record ReservationScope(UUID id, UUID hotelId, UUID agencyId, UUID createdByUserId) {
+  private ReservationView changeStatus(UUID reservationId, RequestActor actor, String targetStatus, String cancelReason) {
+    ReservationScope scope = loadScope(reservationId, actor, ReservationRbacLog.EVENT_STATUS_NOT_FOUND);
+    enforceMutationAccess(actor, scope, ReservationRbacLog.EVENT_STATUS_FORBIDDEN);
+
+    if (!isAllowedTransition(scope.status(), targetStatus)) {
+      log.warn(
+        "{}",
+        ReservationRbacLog.fields(
+          ReservationRbacLog.EVENT_STATUS_INVALID_TRANSITION,
+          actor,
+          reservationId,
+          "DENY",
+          ReservationRbacLog.REASON_INVALID_TRANSITION + ":" + scope.status() + "_to_" + targetStatus
+        )
+      );
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "invalid reservation status transition");
+    }
+
+    if ("CANCELLED".equals(targetStatus)) {
+      jdbc.update(
+        "update reservation set status = ?, cancelled_at = now(), cancel_reason = ?, updated_at = now() where id = ?",
+        targetStatus,
+        cancelReason,
+        reservationId
+      );
+    } else {
+      jdbc.update(
+        "update reservation set status = ?, cancelled_at = null, cancel_reason = null, updated_at = now() where id = ?",
+        targetStatus,
+        reservationId
+      );
+    }
+
+    log.debug(
+      "{}",
+      ReservationRbacLog.fields(
+        ReservationRbacLog.EVENT_STATUS_AUTHORIZED,
+        actor,
+        reservationId,
+        "ALLOW",
+        "transition:" + scope.status() + "_to_" + targetStatus
+      )
+    );
+    return reservationQueryService.getById(reservationId, actor);
+  }
+
+  private boolean isAllowedTransition(String currentStatus, String targetStatus) {
+    if ("NEW".equals(currentStatus)) {
+      return "CONFIRMED".equals(targetStatus) || "CANCELLED".equals(targetStatus) || "NOSHOW".equals(targetStatus);
+    }
+    if ("CONFIRMED".equals(currentStatus)) {
+      return "CANCELLED".equals(targetStatus) || "NOSHOW".equals(targetStatus);
+    }
+    return false;
+  }
+
+  private record ReservationScope(UUID id, UUID hotelId, UUID agencyId, UUID createdByUserId, String status) {
   }
 }
