@@ -3,6 +3,7 @@ package com.rubenrzprz.reshub.reservation;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -206,6 +207,85 @@ class ReservationApiIT {
       .expectStatus().isForbidden();
   }
 
+  @Test
+  void managerCanCreateInternalCommentInOwnHotel() {
+    client.post().uri("/reservations/{id}/comments", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("body", "manager internal note"))
+      .exchange()
+      .expectStatus().isCreated()
+      .expectBody()
+      .jsonPath("$.reservationId").isEqualTo(reservationId.toString())
+      .jsonPath("$.authorUserId").isEqualTo(seed.managerUserId.toString())
+      .jsonPath("$.body").isEqualTo("manager internal note");
+
+    assertCommentCount(reservationId, 1);
+  }
+
+  @Test
+  void receptionistCanCreateInternalCommentInOwnHotel() {
+    client.post().uri("/reservations/{id}/comments", reservationId)
+      .header("X-User-Id", seed.receptionistUserId.toString())
+      .header("X-Role", "RECEPTIONIST")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("body", "reception internal note"))
+      .exchange()
+      .expectStatus().isCreated()
+      .expectBody()
+      .jsonPath("$.authorUserId").isEqualTo(seed.receptionistUserId.toString());
+
+    assertCommentCount(reservationId, 1);
+  }
+
+  @Test
+  void managerCannotCreateCommentForOtherHotelReservation() {
+    client.post().uri("/reservations/{id}/comments", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", UUID.randomUUID().toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("body", "forbidden note"))
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
+  @Test
+  void agencyCannotCreateInternalCommentEvenOnOwnReservation() {
+    client.post().uri("/reservations/{id}/comments", reservationId)
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", seed.agencyId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("body", "agency note"))
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
+  @Test
+  void commentCreationMissingActorHeadersIsUnauthorized() {
+    client.post().uri("/reservations/{id}/comments", reservationId)
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("body", "no actor"))
+      .exchange()
+      .expectStatus().isUnauthorized();
+  }
+
+  @Test
+  void commentCreationForMissingReservationIsNotFound() {
+    client.post().uri("/reservations/{id}/comments", UUID.randomUUID())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("body", "missing reservation"))
+      .exchange()
+      .expectStatus().isNotFound();
+  }
+
   private UUID insertReservation(Seed s) {
     return insertReservation(s, s.receptionistUserId);
   }
@@ -279,6 +359,15 @@ class ReservationApiIT {
 
   private void truncateAll() {
     jdbc.execute("truncate table reservation_comment, reservation, room_type_channel_map, room_type, app_user, agency, hotel restart identity cascade");
+  }
+
+  private void assertCommentCount(UUID reservationId, int expected) {
+    Integer count = jdbc.queryForObject(
+      "select count(*) from reservation_comment where reservation_id = ?",
+      Integer.class,
+      reservationId
+    );
+    Assertions.assertEquals(expected, count);
   }
 
   private record Seed(
