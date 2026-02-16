@@ -505,7 +505,32 @@ class ReservationApiIT {
         "children", 0
       ))
       .exchange()
-      .expectStatus().isBadRequest();
+      .expectStatus().isBadRequest()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("invalid_reservation_payload");
+  }
+
+  @Test
+  void cancelledReservationCannotBeUpdated() {
+    client.post().uri("/reservations/{id}/cancel", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("reason", "cancelled before arrival"))
+      .exchange()
+      .expectStatus().isOk();
+
+    client.patch().uri("/reservations/{id}/notes", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("notes", "attempting post-cancel update"))
+      .exchange()
+      .expectStatus().isEqualTo(409)
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("invalid_status_transition");
   }
 
   @Test
