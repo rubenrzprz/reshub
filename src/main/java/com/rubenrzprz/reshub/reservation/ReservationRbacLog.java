@@ -9,6 +9,10 @@ final class ReservationRbacLog {
   static final String EVENT_READ_FORBIDDEN = "reservation.read.forbidden";
   static final String EVENT_READ_NOT_FOUND = "reservation.read.not_found";
   static final String EVENT_LIST_AUTHORIZED = "reservation.list.authorized";
+  static final String EVENT_CREATE_AUTHORIZED = "reservation.create.authorized";
+  static final String EVENT_CREATE_FORBIDDEN = "reservation.create.forbidden";
+  static final String EVENT_CREATE_CONFLICT = "reservation.create.conflict";
+  static final String EVENT_CREATE_BAD_REQUEST = "reservation.create.bad_request";
   static final String EVENT_UPDATE_AUTHORIZED = "reservation.update.authorized";
   static final String EVENT_UPDATE_FORBIDDEN = "reservation.update.forbidden";
   static final String EVENT_UPDATE_NOT_FOUND = "reservation.update.not_found";

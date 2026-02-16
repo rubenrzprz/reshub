@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -37,6 +38,74 @@ public class ReservationCommandService {
       "{}",
       ReservationRbacLog.fields(
         ReservationRbacLog.EVENT_UPDATE_AUTHORIZED,
+        actor,
+        reservationId,
+        "ALLOW",
+        "scope_match"
+      )
+    );
+    return reservationQueryService.getById(reservationId, actor);
+  }
+
+  public ReservationView createReservation(ReservationCreateRequest request, RequestActor actor) {
+    validateCreateRequest(request);
+    enforceCreateAccess(actor, request);
+
+    UUID reservationId = UUID.randomUUID();
+    int adults = request.adults() == null ? 1 : request.adults();
+    int children = request.children() == null ? 0 : request.children();
+
+    try {
+      jdbc.update(
+        "insert into reservation " +
+          "(id, hotel_id, agency_id, created_by_user_id, room_type_id, external_room_type_code, external_room_type_name, " +
+          "external_ref, status, arrival_date, departure_date, guest_name, adults, children, notes) " +
+          "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        reservationId,
+        request.hotelId(),
+        request.agencyId(),
+        actor.userId(),
+        request.roomTypeId(),
+        request.externalRoomTypeCode(),
+        request.externalRoomTypeName(),
+        request.externalRef(),
+        "NEW",
+        java.sql.Date.valueOf(request.arrivalDate()),
+        java.sql.Date.valueOf(request.departureDate()),
+        request.guestName(),
+        adults,
+        children,
+        request.notes()
+      );
+    } catch (DataIntegrityViolationException ex) {
+      String message = ex.getMostSpecificCause() == null ? "" : ex.getMostSpecificCause().getMessage();
+      if (message.contains("reservation_external_ref_unique")) {
+        log.warn(
+          "event={} actorUserId={} actorRole={} actorHotelId={} actorAgencyId={} reason=duplicate_external_ref",
+          ReservationRbacLog.EVENT_CREATE_CONFLICT,
+          actor.userId(),
+          actor.role(),
+          actor.hotelId(),
+          actor.agencyId()
+        );
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "duplicate external reference for hotel and agency");
+      }
+
+      log.warn(
+        "event={} actorUserId={} actorRole={} actorHotelId={} actorAgencyId={} reason=data_integrity_violation",
+        ReservationRbacLog.EVENT_CREATE_BAD_REQUEST,
+        actor.userId(),
+        actor.role(),
+        actor.hotelId(),
+        actor.agencyId()
+      );
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid reservation payload");
+    }
+
+    log.debug(
+      "{}",
+      ReservationRbacLog.fields(
+        ReservationRbacLog.EVENT_CREATE_AUTHORIZED,
         actor,
         reservationId,
         "ALLOW",
@@ -145,6 +214,27 @@ public class ReservationCommandService {
     }
   }
 
+  private void enforceCreateAccess(RequestActor actor, ReservationCreateRequest request) {
+    Consumer<String> onDeny = reason -> deny(actor, null, ReservationRbacLog.EVENT_CREATE_FORBIDDEN, reason);
+    switch (actor.role()) {
+      case MANAGER, RECEPTIONIST -> ReservationRbacGuards.requireHotelScope(actor, request.hotelId(), onDeny);
+      case AGENCY -> ReservationRbacGuards.requireAgencyScope(actor, request.agencyId(), onDeny);
+      default -> onDeny.accept(ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
+    }
+  }
+
+  private void validateCreateRequest(ReservationCreateRequest request) {
+    if (request == null ||
+      request.hotelId() == null ||
+      request.agencyId() == null ||
+      request.externalRef() == null || request.externalRef().isBlank() ||
+      request.arrivalDate() == null ||
+      request.departureDate() == null ||
+      request.guestName() == null || request.guestName().isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing required reservation fields");
+    }
+  }
+
   private void enforceCommentAccess(RequestActor actor, ReservationScope scope) {
     Consumer<String> onDeny = reason -> deny(actor, scope.id(), ReservationRbacLog.EVENT_COMMENT_FORBIDDEN, reason);
     switch (actor.role()) {
@@ -164,7 +254,7 @@ public class ReservationCommandService {
       ReservationRbacLog.fields(
         event,
         actor,
-        reservationId,
+        reservationId == null ? new UUID(0L, 0L) : reservationId,
         "DENY",
         reason
       )

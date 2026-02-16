@@ -74,6 +74,25 @@ public class ReservationController {
     return reservationQueryService.list(actor, limit, cursor, status);
   }
 
+  @Operation(summary = "Create reservation")
+  @ApiResponse(responseCode = "201", description = "Reservation created and authorized")
+  @ApiResponse(responseCode = "400", description = "Invalid reservation payload")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope")
+  @ApiResponse(responseCode = "409", description = "Duplicate external reference")
+  @PostMapping("/reservations")
+  @ResponseStatus(HttpStatus.CREATED)
+  public ReservationView create(
+    @RequestBody ReservationCreateRequest request,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    return reservationCommandService.createReservation(request, actor);
+  }
+
   @Operation(summary = "Update reservation notes")
   @ApiResponse(responseCode = "200", description = "Reservation updated and authorized")
   @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
