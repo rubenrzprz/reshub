@@ -11,13 +11,22 @@ import org.springframework.web.server.ResponseStatusException;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+  @ExceptionHandler(ApiProblemException.class)
+  ProblemDetail handleApiProblem(ApiProblemException ex, HttpServletRequest request) {
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(ex.status(), ex.getMessage());
+    pd.setTitle(titleFor(ex.status()));
+    pd.setProperty("code", ex.code());
+    pd.setProperty("path", request.getRequestURI());
+    return pd;
+  }
+
   @ExceptionHandler(ResponseStatusException.class)
   ProblemDetail handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
     HttpStatusCode code = ex.getStatusCode();
     String detail = ex.getReason() == null ? "request failed" : ex.getReason();
     ProblemDetail pd = ProblemDetail.forStatusAndDetail(code, detail);
     pd.setTitle(titleFor(code));
-    pd.setProperty("code", mapCode(code, detail));
+    pd.setProperty("code", mapCode(code));
     pd.setProperty("path", request.getRequestURI());
     return pd;
   }
@@ -53,7 +62,7 @@ public class ApiExceptionHandler {
     return "Request Failed";
   }
 
-  private String mapCode(HttpStatusCode status, String detail) {
+  private String mapCode(HttpStatusCode status) {
     if (status.value() == 401) {
       return "unauthorized_actor_context";
     }
@@ -64,30 +73,9 @@ public class ApiExceptionHandler {
       return "reservation_not_found";
     }
     if (status.value() == 409) {
-      if (detail.contains("duplicate external reference")) {
-        return "duplicate_external_ref";
-      }
-      if (detail.contains("invalid reservation status transition")) {
-        return "invalid_status_transition";
-      }
       return "conflict";
     }
     if (status.value() == 400) {
-      if (detail.contains("invalid cursor")) {
-        return "invalid_cursor";
-      }
-      if (detail.contains("limit must be between")) {
-        return "invalid_limit";
-      }
-      if (detail.contains("missing required reservation fields")) {
-        return "invalid_reservation_payload";
-      }
-      if (detail.contains("comment body is required")) {
-        return "invalid_comment_payload";
-      }
-      if (detail.contains("invalid reservation payload")) {
-        return "invalid_reservation_payload";
-      }
       return "bad_request";
     }
     return "request_failed";

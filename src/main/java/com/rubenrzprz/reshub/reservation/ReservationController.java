@@ -1,5 +1,6 @@
 package com.rubenrzprz.reshub.reservation;
 
+import com.rubenrzprz.reshub.api.ApiProblemException;
 import com.rubenrzprz.reshub.security.RequestActor;
 import com.rubenrzprz.reshub.security.RequestActorResolver;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @Tag(name = "Reservations", description = "Reservation read operations")
 @RestController
@@ -68,7 +68,7 @@ public class ReservationController {
     @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
   ) {
     if (limit < 1 || limit > 200) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 200");
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_limit", "limit must be between 1 and 200");
     }
     RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
     return reservationQueryService.list(actor, limit, cursor, status);

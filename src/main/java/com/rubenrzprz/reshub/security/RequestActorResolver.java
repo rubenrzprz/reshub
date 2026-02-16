@@ -1,9 +1,9 @@
 package com.rubenrzprz.reshub.security;
 
+import com.rubenrzprz.reshub.api.ApiProblemException;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public class RequestActorResolver {
@@ -15,7 +15,7 @@ public class RequestActorResolver {
     String agencyIdHeader
   ) {
     if (userIdHeader == null || userIdHeader.isBlank() || roleHeader == null || roleHeader.isBlank()) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "missing actor headers");
+      throw new ApiProblemException(HttpStatus.UNAUTHORIZED, "unauthorized_actor_context", "missing actor headers");
     }
 
     UUID userId = parseUuid(userIdHeader, "X-User-Id");
@@ -24,11 +24,19 @@ public class RequestActorResolver {
     UUID agencyId = parseOptionalUuid(agencyIdHeader, "X-Agency-Id");
 
     if (role == RequestActor.Role.AGENCY && agencyId == null) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "agency actor requires X-Agency-Id");
+      throw new ApiProblemException(
+        HttpStatus.UNAUTHORIZED,
+        "unauthorized_actor_context",
+        "agency actor requires X-Agency-Id"
+      );
     }
 
     if ((role == RequestActor.Role.MANAGER || role == RequestActor.Role.RECEPTIONIST) && hotelId == null) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "staff actor requires X-Hotel-Id");
+      throw new ApiProblemException(
+        HttpStatus.UNAUTHORIZED,
+        "unauthorized_actor_context",
+        "staff actor requires X-Hotel-Id"
+      );
     }
 
     return new RequestActor(userId, role, hotelId, agencyId);
@@ -45,7 +53,11 @@ public class RequestActorResolver {
     try {
       return UUID.fromString(value);
     } catch (IllegalArgumentException ex) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid UUID in " + header);
+      throw new ApiProblemException(
+        HttpStatus.UNAUTHORIZED,
+        "unauthorized_actor_context",
+        "invalid UUID in " + header
+      );
     }
   }
 
@@ -53,7 +65,7 @@ public class RequestActorResolver {
     try {
       return RequestActor.Role.valueOf(value);
     } catch (IllegalArgumentException ex) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid X-Role");
+      throw new ApiProblemException(HttpStatus.UNAUTHORIZED, "unauthorized_actor_context", "invalid X-Role");
     }
   }
 }

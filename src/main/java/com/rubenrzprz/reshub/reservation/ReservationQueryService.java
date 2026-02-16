@@ -1,5 +1,6 @@
 package com.rubenrzprz.reshub.reservation;
 
+import com.rubenrzprz.reshub.api.ApiProblemException;
 import com.rubenrzprz.reshub.security.RequestActor;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
@@ -14,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ReservationQueryService {
@@ -55,7 +55,7 @@ public class ReservationQueryService {
         actor.agencyId(),
         reservationId
       );
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "reservation not found");
+      throw new ApiProblemException(HttpStatus.NOT_FOUND, "reservation_not_found", "reservation not found");
     }
 
     ReservationView reservation = rows.getFirst();
@@ -85,7 +85,7 @@ public class ReservationQueryService {
         sql.append("agency_id = ? ");
         args.add(actor.agencyId());
       }
-      default -> throw new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden reservation scope");
+      default -> throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
     }
 
     if (status != null && !status.isBlank()) {
@@ -151,7 +151,7 @@ public class ReservationQueryService {
 
   private void deny(RequestActor actor, UUID reservationId, String reason) {
     log.warn("{}", ReservationRbacLog.readFields(actor, reservationId, "DENY", reason));
-    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden reservation scope");
+    throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
   }
 
   private java.time.LocalDate toLocalDate(Date value) {
@@ -170,7 +170,7 @@ public class ReservationQueryService {
       }
       return new CursorKey(LocalDate.parse(parts[0]), UUID.fromString(parts[1]));
     } catch (Exception ex) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid cursor");
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_cursor", "invalid cursor");
     }
   }
 
