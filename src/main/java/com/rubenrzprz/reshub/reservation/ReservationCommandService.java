@@ -1,5 +1,6 @@
 package com.rubenrzprz.reshub.reservation;
 
+import com.rubenrzprz.reshub.api.ApiProblemException;
 import com.rubenrzprz.reshub.security.RequestActor;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
@@ -9,11 +10,11 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ReservationCommandService {
@@ -32,7 +33,11 @@ public class ReservationCommandService {
     ReservationScope scope = loadScope(reservationId, actor);
     enforceMutationAccess(actor, scope, ReservationRbacLog.EVENT_UPDATE_FORBIDDEN);
 
-    jdbc.update("update reservation set notes = ?, updated_at = now() where id = ?", notes, reservationId);
+    try {
+      jdbc.update("update reservation set notes = ?, updated_at = now() where id = ?", notes, reservationId);
+    } catch (DataAccessException ex) {
+      throw mapMutationViolation(ex);
+    }
 
     log.debug(
       "{}",
@@ -88,7 +93,11 @@ public class ReservationCommandService {
           actor.hotelId(),
           actor.agencyId()
         );
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "duplicate external reference for hotel and agency");
+        throw new ApiProblemException(
+          HttpStatus.CONFLICT,
+          "duplicate_external_ref",
+          "duplicate external reference for hotel and agency"
+        );
       }
 
       log.warn(
@@ -99,7 +108,7 @@ public class ReservationCommandService {
         actor.hotelId(),
         actor.agencyId()
       );
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid reservation payload");
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_reservation_payload", "invalid reservation payload");
     }
 
     log.debug(
@@ -129,7 +138,7 @@ public class ReservationCommandService {
 
   public ReservationCommentView addComment(UUID reservationId, String body, RequestActor actor) {
     if (body == null || body.isBlank()) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "comment body is required");
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_comment_payload", "comment body is required");
     }
 
     ReservationScope scope = loadScope(reservationId, actor, ReservationRbacLog.EVENT_COMMENT_NOT_FOUND);
@@ -191,7 +200,7 @@ public class ReservationCommandService {
         actor.agencyId(),
         reservationId
       );
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "reservation not found");
+      throw new ApiProblemException(HttpStatus.NOT_FOUND, "reservation_not_found", "reservation not found");
     }
 
     return rows.getFirst();
@@ -231,7 +240,27 @@ public class ReservationCommandService {
       request.arrivalDate() == null ||
       request.departureDate() == null ||
       request.guestName() == null || request.guestName().isBlank()) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing required reservation fields");
+      throw new ApiProblemException(
+        HttpStatus.BAD_REQUEST,
+        "invalid_reservation_payload",
+        "missing required reservation fields"
+      );
+    }
+
+    if (!request.arrivalDate().isBefore(request.departureDate())) {
+      throw new ApiProblemException(
+        HttpStatus.BAD_REQUEST,
+        "invalid_reservation_payload",
+        "arrival date must be before departure date"
+      );
+    }
+
+    if (request.adults() != null && request.adults() < 1) {
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_reservation_payload", "adults must be at least 1");
+    }
+
+    if (request.children() != null && request.children() < 0) {
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_reservation_payload", "children cannot be negative");
     }
   }
 
@@ -254,12 +283,12 @@ public class ReservationCommandService {
       ReservationRbacLog.fields(
         event,
         actor,
-        reservationId == null ? new UUID(0L, 0L) : reservationId,
+        reservationId,
         "DENY",
         reason
       )
     );
-    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden reservation scope");
+    throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
   }
 
   private OffsetDateTime toOffsetDateTime(Timestamp timestamp) {
@@ -281,22 +310,30 @@ public class ReservationCommandService {
           ReservationRbacLog.REASON_INVALID_TRANSITION + ":" + scope.status() + "_to_" + targetStatus
         )
       );
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "invalid reservation status transition");
+      throw new ApiProblemException(
+        HttpStatus.CONFLICT,
+        "invalid_status_transition",
+        "invalid reservation status transition"
+      );
     }
 
-    if ("CANCELLED".equals(targetStatus)) {
-      jdbc.update(
-        "update reservation set status = ?, cancelled_at = now(), cancel_reason = ?, updated_at = now() where id = ?",
-        targetStatus,
-        cancelReason,
-        reservationId
-      );
-    } else {
-      jdbc.update(
-        "update reservation set status = ?, cancelled_at = null, cancel_reason = null, updated_at = now() where id = ?",
-        targetStatus,
-        reservationId
-      );
+    try {
+      if ("CANCELLED".equals(targetStatus)) {
+        jdbc.update(
+          "update reservation set status = ?, cancelled_at = now(), cancel_reason = ?, updated_at = now() where id = ?",
+          targetStatus,
+          cancelReason,
+          reservationId
+        );
+      } else {
+        jdbc.update(
+          "update reservation set status = ?, cancelled_at = null, cancel_reason = null, updated_at = now() where id = ?",
+          targetStatus,
+          reservationId
+        );
+      }
+    } catch (DataAccessException ex) {
+      throw mapMutationViolation(ex);
     }
 
     log.debug(
@@ -320,6 +357,19 @@ public class ReservationCommandService {
       return "CANCELLED".equals(targetStatus) || "NOSHOW".equals(targetStatus);
     }
     return false;
+  }
+
+  private ApiProblemException mapMutationViolation(DataAccessException ex) {
+    String message = ex.getMostSpecificCause() == null ? "" : ex.getMostSpecificCause().getMessage();
+    if (message.contains("invalid reservation status transition") ||
+      message.contains("terminal reservation is immutable")) {
+      return new ApiProblemException(
+        HttpStatus.CONFLICT,
+        "invalid_status_transition",
+        "invalid reservation status transition"
+      );
+    }
+    return new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_reservation_payload", "invalid reservation payload");
   }
 
   private record ReservationScope(UUID id, UUID hotelId, UUID agencyId, UUID createdByUserId, String status) {

@@ -35,12 +35,13 @@ final class ReservationRbacLog {
   }
 
   static String fields(String event, RequestActor actor, UUID reservationId, String decision, String reason) {
+    String reservationValue = reservationId == null ? "n/a" : reservationId.toString();
     return "event=" + event +
       " actorUserId=" + actor.userId() +
       " actorRole=" + actor.role() +
       " actorHotelId=" + actor.hotelId() +
       " actorAgencyId=" + actor.agencyId() +
-      " reservationId=" + reservationId +
+      " reservationId=" + reservationValue +
       " decision=" + decision +
       " reason=" + reason;
   }
