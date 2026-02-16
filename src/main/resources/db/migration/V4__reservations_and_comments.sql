@@ -25,6 +25,10 @@ create table if not exists reservation
   constraint reservation_status_check check (status in ('NEW', 'CONFIRMED', 'CANCELLED', 'NOSHOW')),
   constraint reservation_date_check check (arrival_date < departure_date),
   constraint reservation_party_check check (adults >= 1 and children >= 0),
+  constraint reservation_cancelled_at_check check (
+    (status = 'CANCELLED' and cancelled_at is not null) or
+    (status <> 'CANCELLED' and cancelled_at is null)
+  ),
   constraint reservation_external_ref_unique unique (hotel_id, agency_id, external_ref),
   constraint reservation_room_type_hotel_fk
     foreign key (hotel_id, room_type_id) references room_type(hotel_id, id) on delete restrict
@@ -48,6 +52,13 @@ create or replace function reservation_status_transition_guard()
 returns trigger as $$
 begin
   if (tg_op = 'UPDATE') then
+    if (old.status in ('CANCELLED', 'NOSHOW')) then
+      if (old is distinct from new) then
+        raise exception 'terminal reservation is immutable in status %', old.status;
+      end if;
+      return new;
+    end if;
+
     if (old.status = new.status) then
       return new;
     end if;
