@@ -1,6 +1,6 @@
 # 🏗️ ResHub — Architecture (Domain & Data Model)
 
-**Version:** 0.2 (MVP)  
+**Version:** 0.3 (MVP)  
 **Status:** Draft — authoritative design for MVP; kept in sync with migrations
 
 ---
@@ -62,7 +62,7 @@
 - **RECEPTIONIST** — CRUD on own-created reservations; may comment on any reservation in their hotel.
 - **AGENCY** — CRUD only on reservations created by that agency; cannot post comments after creation (may include a one-time `notes` at create).
 
-(Enforcement in service layer; DB only encodes ownership & constraints.)
+(Enforcement in service/API layer with standardized `ProblemDetail` codes; DB encodes integrity + lifecycle constraints.)
 
 ---
 
@@ -211,6 +211,8 @@
 
 * `arrival_date < departure_date`
 * `adults >= 1`, `children >= 0`
+* `status='CANCELLED' => cancelled_at IS NOT NULL`
+* `status<>'CANCELLED' => cancelled_at IS NULL`
 
 **Uniqueness**
 
@@ -281,11 +283,11 @@
 
   * Allowed: `NEW → CONFIRMED | CANCELLED | NOSHOW`
   * Allowed: `CONFIRMED → CANCELLED | NOSHOW`
-  * Terminal: `CANCELLED`, `NOSHOW` (non-mutable)
+  * Terminal: `CANCELLED`, `NOSHOW` (non-mutable; row updates rejected by DB trigger)
   * On `CANCELLED`, set `cancelled_at` and optional `cancel_reason`.
 * **Never delete reservations**; enforce with status, not deletions.
 * **Idempotency**: `(hotel_id, agency_id, external_ref)` uniquely identifies an external booking attempt.
-* **RBAC** (service layer):
+* **RBAC** (service/API layer):
 
   * AGENCY: own reservations only; no post-create comments.
   * RECEPTIONIST: CRUD own; comment any in hotel.
@@ -324,7 +326,7 @@
 
 ---
 
-## 8) 🗂️ Migrations Policy & Plan (V1–V4)
+## 8) 🗂️ Migrations Policy & Plan (V1–V5)
 
 **Policy**
 
@@ -346,10 +348,18 @@
 
 * **AGENCY create**: require `external_room_type_code`; optional `external_room_type_name`. Attempt mapping; late bind if unresolved.
 * **STAFF create**: require `room_type_id` (must belong to the same `hotel_id`).
+* **List endpoint**: `GET /reservations` uses keyset pagination ordered by `(arrival_date ASC, id ASC)`.
 * **ProblemDetail** codes to standardize:
 
-  * `room_type_required_for_staff`
-  * `external_room_type_code_required_for_agency`
+  * `unauthorized_actor_context`
+  * `forbidden_scope`
+  * `reservation_not_found`
+  * `duplicate_external_ref`
+  * `invalid_status_transition`
+  * `invalid_reservation_payload`
+  * `invalid_comment_payload`
+  * `invalid_cursor`
+  * `invalid_limit`
   * `agency_not_authorized_for_hotel` (when flag enabled)
   * `room_type_not_authorized` (when flag enabled + granular list active)
 
@@ -381,5 +391,6 @@
 
 ## 13) 📝 Change Log
 
+* v0.3 — Added reservations/comments lifecycle constraints (V4), RBAC service/API enforcement, and standardized `ProblemDetail` error codes.
 * v0.2 — Added room_type_channel_map hotel integrity constraints (V3).
 * v0.1 — Initial MVP model (this document).
