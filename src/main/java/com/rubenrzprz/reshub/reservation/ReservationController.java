@@ -7,7 +7,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,13 +18,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReservationController {
 
   private final ReservationQueryService reservationQueryService;
+  private final ReservationCommandService reservationCommandService;
   private final RequestActorResolver actorResolver;
 
   public ReservationController(
     ReservationQueryService reservationQueryService,
+    ReservationCommandService reservationCommandService,
     RequestActorResolver actorResolver
   ) {
     this.reservationQueryService = reservationQueryService;
+    this.reservationCommandService = reservationCommandService;
     this.actorResolver = actorResolver;
   }
 
@@ -41,5 +46,23 @@ public class ReservationController {
   ) {
     RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
     return reservationQueryService.getById(id, actor);
+  }
+
+  @Operation(summary = "Update reservation notes")
+  @ApiResponse(responseCode = "200", description = "Reservation updated and authorized")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope")
+  @ApiResponse(responseCode = "404", description = "Reservation not found")
+  @PatchMapping("/reservations/{id}/notes")
+  public ReservationView updateNotes(
+    @PathVariable UUID id,
+    @RequestBody ReservationNotesUpdateRequest request,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    return reservationCommandService.updateNotes(id, request.notes(), actor);
   }
 }
