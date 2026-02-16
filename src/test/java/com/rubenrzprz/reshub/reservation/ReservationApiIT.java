@@ -1,5 +1,7 @@
 package com.rubenrzprz.reshub.reservation;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +45,9 @@ class ReservationApiIT {
 
   @Autowired
   JdbcTemplate jdbc;
+
+  @Autowired
+  ObjectMapper objectMapper;
 
   private Seed seed;
   private UUID reservationId;
@@ -379,24 +384,141 @@ class ReservationApiIT {
       .expectStatus().isUnauthorized();
   }
 
+  @Test
+  void managerListIsScopedToOwnHotel() {
+    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 21));
+    insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "NEW", LocalDate.of(2026, 2, 22));
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 50).build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(2)
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString())
+      .jsonPath("$.items[1].hotelId").isEqualTo(seed.hotelId.toString());
+  }
+
+  @Test
+  void agencyListIsScopedToOwnAgency() {
+    insertReservation(seed, seed.hotelId, seed.otherAgencyId, seed.otherAgencyUserId, "NEW", LocalDate.of(2026, 2, 21));
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 50).build())
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", seed.agencyId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(1)
+      .jsonPath("$.items[0].agencyId").isEqualTo(seed.agencyId.toString());
+  }
+
+  @Test
+  void keysetPaginationReturnsNextCursorAndSecondPage() throws Exception {
+    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 21));
+    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 22));
+
+    String page1Body = client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 2).build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody(String.class)
+      .returnResult()
+      .getResponseBody();
+
+    JsonNode firstPage = objectMapper.readTree(page1Body);
+    Assertions.assertEquals(2, firstPage.path("items").size());
+    Assertions.assertEquals("2026-02-20", firstPage.path("items").get(0).path("arrivalDate").asText());
+    Assertions.assertEquals("2026-02-21", firstPage.path("items").get(1).path("arrivalDate").asText());
+    String nextCursor = firstPage.path("nextCursor").asText();
+    Assertions.assertFalse(nextCursor == null || nextCursor.isBlank());
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 2).queryParam("cursor", nextCursor).build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(1)
+      .jsonPath("$.items[0].arrivalDate").isEqualTo("2026-02-22")
+      .jsonPath("$.nextCursor").isEmpty();
+  }
+
+  @Test
+  void invalidCursorIsBadRequest() {
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("cursor", "invalid").build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isBadRequest();
+  }
+
+  @Test
+  void limitAboveMaxIsBadRequest() {
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 201).build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isBadRequest();
+  }
+
+  @Test
+  void statusFilterAppliesWithinScope() {
+    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "CONFIRMED", LocalDate.of(2026, 2, 23));
+    insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "CONFIRMED", LocalDate.of(2026, 2, 24));
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
+      .queryParam("limit", 50)
+      .queryParam("status", "CONFIRMED")
+      .build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(1)
+      .jsonPath("$.items[0].status").isEqualTo("CONFIRMED")
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString());
+  }
+
   private UUID insertReservation(Seed s) {
     return insertReservation(s, s.receptionistUserId);
   }
 
   private UUID insertReservation(Seed s, UUID createdByUserId) {
+    return insertReservation(s, s.hotelId, s.agencyId, createdByUserId, "NEW", LocalDate.of(2026, 2, 20));
+  }
+
+  private UUID insertReservation(
+    Seed s,
+    UUID hotelId,
+    UUID agencyId,
+    UUID createdByUserId,
+    String status,
+    LocalDate arrivalDate
+  ) {
     UUID id = UUID.randomUUID();
     jdbc.update(
       "insert into reservation " +
         "(id, hotel_id, agency_id, created_by_user_id, external_ref, status, arrival_date, departure_date, guest_name, adults, children) " +
         "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       id,
-      s.hotelId,
-      s.agencyId,
+      hotelId,
+      agencyId,
       createdByUserId,
       "ext-" + id.toString().substring(0, 8),
-      "NEW",
-      java.sql.Date.valueOf(LocalDate.of(2026, 2, 20)),
-      java.sql.Date.valueOf(LocalDate.of(2026, 2, 22)),
+      status,
+      java.sql.Date.valueOf(arrivalDate),
+      java.sql.Date.valueOf(arrivalDate.plusDays(2)),
       "Test Guest",
       2,
       0
@@ -447,7 +569,49 @@ class ReservationApiIT {
       agencyId
     );
 
-    return new Seed(hotelId, agencyId, managerUserId, receptionistUserId, agencyUserId);
+    UUID otherHotelId = UUID.randomUUID();
+    jdbc.update("insert into hotel (id, code, name) values (?, ?, ?)",
+      otherHotelId,
+      "h" + otherHotelId.toString().replace("-", "").substring(0, 8),
+      "Other Hotel");
+
+    UUID otherAgencyId = UUID.randomUUID();
+    jdbc.update("insert into agency (id, code, name) values (?, ?, ?)",
+      otherAgencyId,
+      "a" + otherAgencyId.toString().replace("-", "").substring(0, 8),
+      "Other Agency");
+
+    UUID otherManagerUserId = UUID.randomUUID();
+    jdbc.update(
+      "insert into app_user (id, email, password_hash, role, hotel_id) values (?, ?, ?, ?, ?)",
+      otherManagerUserId,
+      "other-manager-" + otherManagerUserId.toString().substring(0, 8) + "@example.com",
+      "hash",
+      "MANAGER",
+      otherHotelId
+    );
+
+    UUID otherAgencyUserId = UUID.randomUUID();
+    jdbc.update(
+      "insert into app_user (id, email, password_hash, role, agency_id) values (?, ?, ?, ?, ?)",
+      otherAgencyUserId,
+      "other-agency-" + otherAgencyUserId.toString().substring(0, 8) + "@example.com",
+      "hash",
+      "AGENCY",
+      otherAgencyId
+    );
+
+    return new Seed(
+      hotelId,
+      agencyId,
+      managerUserId,
+      receptionistUserId,
+      agencyUserId,
+      otherHotelId,
+      otherAgencyId,
+      otherManagerUserId,
+      otherAgencyUserId
+    );
   }
 
   private void truncateAll() {
@@ -484,6 +648,10 @@ class ReservationApiIT {
     UUID agencyId,
     UUID managerUserId,
     UUID receptionistUserId,
-    UUID agencyUserId
+    UUID agencyUserId,
+    UUID otherHotelId,
+    UUID otherAgencyId,
+    UUID otherManagerUserId,
+    UUID otherAgencyUserId
   ) {}
 }
