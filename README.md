@@ -4,7 +4,7 @@
 
 **Status:** WIP 🛠️
 
-Secure, multi-tenant reservation API demonstrating **JWT + RBAC**, robust search (pagination/filters), and **CSV/JSON** exports. Built for clarity, testability, and easy demo.
+Secure, multi-tenant reservation API demonstrating **RBAC enforcement**, robust search (pagination/filters), and **CSV/JSON** exports. Built for clarity, testability, and easy demo.
 
 ---
 
@@ -28,10 +28,11 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 ---
 
 ## ✨ Features
-- 🔐 JWT login with roles: **MANAGER**, **RECEPTIONIST**, **AGENCY**
+- 🔐 Role-based access control for **MANAGER**, **RECEPTIONIST**, **AGENCY**
 - 🔎 Search by date range, status, and free-text guest; pagination & sorting
 - 📤 CSV/JSON export of filtered results
 - 🧭 Idempotent `externalRef` per (hotel, agency)
+- 🧱 Standardized `ProblemDetail` error codes (401/403/404/409/400 paths)
 - ✅ Integration tests with **Testcontainers (Postgres)**
 
 ---
@@ -57,6 +58,7 @@ High-level overview of the domain & data model. For the full spec, see **[docs/A
 - **Tenancy:** single DB; entities scoped by `hotel_id` where applicable.
 - **Core entities:** `hotel`, `agency`, `app_user`, `room_type`, `room_type_channel_map`, `reservation`, `reservation_comment`.
 - **Reservations:** lifecycle `NEW → CONFIRMED → CANCELLED | NOSHOW`; never delete (use status + `cancelled_at`).
+- **Lifecycle guardrails:** terminal reservations (`CANCELLED`, `NOSHOW`) are immutable.
 - **Idempotency:** unique `(hotel_id, agency_id, external_ref)`.
 - **Room types:** hotel-scoped with `attributes_raw` + `attributes_canonical` (JSONB), GIN index; channel mapping; **late binding**.
 - **Migrations:** V1 (baseline) → V2 (room modeling) → V3 (room type channel map integrity) → V4 (reservations/comments) → V5 (agency authorization, flag-gated).
@@ -117,9 +119,10 @@ mvn -q test
 * [x] Bootstrap application with `/health` and Swagger UI
 * [x] CI for PRs and `main` (build + tests)
 * [x] Database baseline (PostgreSQL + Flyway)
-* [ ] Auth (JWT) + Roles enforcement
-* [ ] Reservations CRUD + search + exports
-* [ ] Integration tests (Testcontainers)
+* [ ] Auth (JWT) + token issuance
+* [x] Roles enforcement (service/API scope checks)
+* [x] Reservations CRUD + list pagination (RBAC-scoped)
+* [x] Integration tests (Testcontainers)
 
 ---
 
