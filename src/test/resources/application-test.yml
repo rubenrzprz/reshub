@@ -1,3 +1,7 @@
 spring:
   application:
     name: reshub-test
+
+logging:
+  level:
+    com.rubenrzprz.reshub: DEBUG
