@@ -7,20 +7,20 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
 @SpringBootTest
 abstract class FlywayITBase {
 
   @SuppressWarnings("resource")
-  @Container
-  static PostgreSQLContainer<?> postgres =
+  static final PostgreSQLContainer<?> postgres =
     new PostgreSQLContainer<>("postgres:16-alpine")
       .withDatabaseName("reshub")
       .withUsername("reshub")
       .withPassword("reshub");
+
+  static {
+    postgres.start();
+  }
 
   @DynamicPropertySource
   static void register(DynamicPropertyRegistry r) {
