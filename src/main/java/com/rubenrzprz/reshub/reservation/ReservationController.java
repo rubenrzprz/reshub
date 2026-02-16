@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Tag(name = "Reservations", description = "Reservation read operations")
 @RestController
@@ -49,6 +51,27 @@ public class ReservationController {
   ) {
     RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
     return reservationQueryService.getById(id, actor);
+  }
+
+  @Operation(summary = "List reservations with keyset pagination")
+  @ApiResponse(responseCode = "200", description = "Reservations listed and authorized")
+  @ApiResponse(responseCode = "400", description = "Invalid pagination/filter input")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @GetMapping("/reservations")
+  public ReservationListResponse list(
+    @RequestParam(name = "limit", defaultValue = "50") int limit,
+    @RequestParam(name = "cursor", required = false) String cursor,
+    @RequestParam(name = "status", required = false) String status,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    if (limit < 1 || limit > 200) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 200");
+    }
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    return reservationQueryService.list(actor, limit, cursor, status);
   }
 
   @Operation(summary = "Update reservation notes")
