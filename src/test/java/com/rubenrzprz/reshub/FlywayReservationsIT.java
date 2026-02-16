@@ -1,7 +1,9 @@
 package com.rubenrzprz.reshub;
 
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,7 @@ class FlywayReservationsIT extends FlywayITBase {
     Assertions.assertEquals(1, tableExists("reservation"));
     Assertions.assertEquals(1, tableExists("reservation_comment"));
     Assertions.assertEquals(1, constraintExists("reservation_date_check"));
+    Assertions.assertEquals(1, constraintExists("reservation_cancelled_at_check"));
     Assertions.assertEquals(1, constraintExists("reservation_external_ref_unique"));
     Assertions.assertEquals(1, constraintExists("reservation_room_type_hotel_fk"));
     Assertions.assertEquals(1, indexExists("reservation", "idx_reservation_hotel_arrival"));
@@ -80,6 +83,26 @@ class FlywayReservationsIT extends FlywayITBase {
       insertReservation(seed, UUID.randomUUID(), "ext-bad-date", "NEW",
         LocalDate.of(2026, 2, 20), LocalDate.of(2026, 2, 20))
     );
+    Assertions.assertThrows(DataIntegrityViolationException.class, () ->
+      jdbc.update(
+        "insert into reservation " +
+          "(id, hotel_id, agency_id, created_by_user_id, external_ref, status, " +
+          "arrival_date, departure_date, guest_name, adults, children, cancelled_at) " +
+          "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        UUID.randomUUID(),
+        seed.hotelId,
+        seed.agencyId,
+        seed.userId,
+        "ext-bad-cancelled-at",
+        "CANCELLED",
+        Date.valueOf(LocalDate.of(2026, 2, 20)),
+        Date.valueOf(LocalDate.of(2026, 2, 21)),
+        "Test Guest",
+        1,
+        0,
+        null
+      )
+    );
 
     UUID reservationId = UUID.randomUUID();
     insertReservation(seed, reservationId, "ext-cancelled", "CANCELLED",
@@ -88,6 +111,13 @@ class FlywayReservationsIT extends FlywayITBase {
       jdbc.update(
         "update reservation set status = ? where id = ?",
         "CONFIRMED",
+        reservationId
+      )
+    );
+    Assertions.assertThrows(DataAccessException.class, () ->
+      jdbc.update(
+        "update reservation set guest_name = ? where id = ?",
+        "Mutated Guest",
         reservationId
       )
     );
@@ -129,8 +159,8 @@ class FlywayReservationsIT extends FlywayITBase {
     jdbc.update(
       "insert into reservation " +
         "(id, hotel_id, agency_id, created_by_user_id, external_ref, status, " +
-        "arrival_date, departure_date, guest_name, adults, children) " +
-        "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "arrival_date, departure_date, guest_name, adults, children, cancelled_at) " +
+        "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       reservationId,
       seed.hotelId,
       seed.agencyId,
@@ -141,7 +171,10 @@ class FlywayReservationsIT extends FlywayITBase {
       Date.valueOf(departure),
       "Test Guest",
       1,
-      0
+      0,
+      status.equals("CANCELLED")
+        ? Timestamp.valueOf(LocalDateTime.of(2026, 2, 1, 0, 0))
+        : null
     );
   }
 
