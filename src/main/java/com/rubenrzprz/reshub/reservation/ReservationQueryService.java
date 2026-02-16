@@ -4,6 +4,7 @@ import com.rubenrzprz.reshub.security.RequestActor;
 import java.sql.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -57,29 +58,22 @@ public class ReservationQueryService {
     enforceReadAccess(actor, reservation);
     log.debug(
       "{}",
-      ReservationRbacLog.fields(actor, reservation.id(), "ALLOW", "scope_match")
+      ReservationRbacLog.readFields(actor, reservation.id(), "ALLOW", "scope_match")
     );
     return reservation;
   }
 
   private void enforceReadAccess(RequestActor actor, ReservationView reservation) {
+    Consumer<String> onDeny = reason -> deny(actor, reservation.id(), reason);
     switch (actor.role()) {
-      case MANAGER, RECEPTIONIST -> {
-        if (!reservation.hotelId().equals(actor.hotelId())) {
-          deny(actor, reservation.id(), ReservationRbacLog.REASON_HOTEL_SCOPE_MISMATCH);
-        }
-      }
-      case AGENCY -> {
-        if (!reservation.agencyId().equals(actor.agencyId())) {
-          deny(actor, reservation.id(), ReservationRbacLog.REASON_AGENCY_SCOPE_MISMATCH);
-        }
-      }
-      default -> deny(actor, reservation.id(), ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
+      case MANAGER, RECEPTIONIST -> ReservationRbacGuards.requireHotelScope(actor, reservation.hotelId(), onDeny);
+      case AGENCY -> ReservationRbacGuards.requireAgencyScope(actor, reservation.agencyId(), onDeny);
+      default -> onDeny.accept(ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
     }
   }
 
   private void deny(RequestActor actor, UUID reservationId, String reason) {
-    log.warn("{}", ReservationRbacLog.fields(actor, reservationId, "DENY", reason));
+    log.warn("{}", ReservationRbacLog.readFields(actor, reservationId, "DENY", reason));
     throw new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden reservation scope");
   }
 
