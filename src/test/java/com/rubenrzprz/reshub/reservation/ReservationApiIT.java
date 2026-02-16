@@ -1,6 +1,7 @@
 package com.rubenrzprz.reshub.reservation;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -125,7 +126,91 @@ class ReservationApiIT {
       .expectStatus().isNotFound();
   }
 
+  @Test
+  void managerCanUpdateNotesInOwnHotel() {
+    client.patch().uri("/reservations/{id}/notes", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("notes", "manager update"))
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.notes").isEqualTo("manager update");
+  }
+
+  @Test
+  void receptionistCanUpdateOwnReservationNotes() {
+    client.patch().uri("/reservations/{id}/notes", reservationId)
+      .header("X-User-Id", seed.receptionistUserId.toString())
+      .header("X-Role", "RECEPTIONIST")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("notes", "reception update"))
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.notes").isEqualTo("reception update");
+  }
+
+  @Test
+  void receptionistCannotUpdateReservationCreatedByAnotherUser() {
+    UUID managerCreatedReservation = insertReservation(seed, seed.managerUserId);
+
+    client.patch().uri("/reservations/{id}/notes", managerCreatedReservation)
+      .header("X-User-Id", seed.receptionistUserId.toString())
+      .header("X-Role", "RECEPTIONIST")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("notes", "forbidden update"))
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
+  @Test
+  void managerCannotUpdateReservationFromOtherHotel() {
+    client.patch().uri("/reservations/{id}/notes", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", UUID.randomUUID().toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("notes", "forbidden update"))
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
+  @Test
+  void agencyCanUpdateOwnAgencyReservationNotes() {
+    client.patch().uri("/reservations/{id}/notes", reservationId)
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", seed.agencyId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("notes", "agency update"))
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.notes").isEqualTo("agency update");
+  }
+
+  @Test
+  void agencyCannotUpdateOtherAgencyReservation() {
+    client.patch().uri("/reservations/{id}/notes", reservationId)
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", UUID.randomUUID().toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("notes", "forbidden update"))
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
   private UUID insertReservation(Seed s) {
+    return insertReservation(s, s.receptionistUserId);
+  }
+
+  private UUID insertReservation(Seed s, UUID createdByUserId) {
     UUID id = UUID.randomUUID();
     jdbc.update(
       "insert into reservation " +
@@ -134,7 +219,7 @@ class ReservationApiIT {
       id,
       s.hotelId,
       s.agencyId,
-      s.receptionistUserId,
+      createdByUserId,
       "ext-" + id.toString().substring(0, 8),
       "NEW",
       java.sql.Date.valueOf(LocalDate.of(2026, 2, 20)),
