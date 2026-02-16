@@ -1,6 +1,9 @@
 package com.rubenrzprz.reshub.reservation;
 
 import com.rubenrzprz.reshub.security.RequestActor;
+import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -43,7 +46,48 @@ public class ReservationCommandService {
     return reservationQueryService.getById(reservationId, actor);
   }
 
-  private ReservationScope loadScope(UUID reservationId, RequestActor actor) {
+  public ReservationCommentView addComment(UUID reservationId, String body, RequestActor actor) {
+    if (body == null || body.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "comment body is required");
+    }
+
+    ReservationScope scope = loadScope(reservationId, actor, ReservationRbacLog.EVENT_COMMENT_NOT_FOUND);
+    enforceCommentAccess(actor, scope);
+
+    UUID commentId = UUID.randomUUID();
+    jdbc.update(
+      "insert into reservation_comment (id, reservation_id, author_user_id, body) values (?, ?, ?, ?)",
+      commentId,
+      reservationId,
+      actor.userId(),
+      body
+    );
+
+    log.debug(
+      "{}",
+      ReservationRbacLog.fields(
+        ReservationRbacLog.EVENT_COMMENT_AUTHORIZED,
+        actor,
+        reservationId,
+        "ALLOW",
+        "scope_match"
+      )
+    );
+
+    return jdbc.queryForObject(
+      "select id, reservation_id, author_user_id, body, created_at from reservation_comment where id = ?",
+      (rs, rowNum) -> new ReservationCommentView(
+        UUID.fromString(rs.getString("id")),
+        UUID.fromString(rs.getString("reservation_id")),
+        UUID.fromString(rs.getString("author_user_id")),
+        rs.getString("body"),
+        toOffsetDateTime(rs.getTimestamp("created_at"))
+      ),
+      commentId
+    );
+  }
+
+  private ReservationScope loadScope(UUID reservationId, RequestActor actor, String notFoundEvent) {
     List<ReservationScope> rows = jdbc.query(
       "select id, hotel_id, agency_id, created_by_user_id from reservation where id = ?",
       (rs, rowNum) -> new ReservationScope(
@@ -58,7 +102,7 @@ public class ReservationCommandService {
     if (rows.isEmpty()) {
       log.warn(
         "event={} actorUserId={} actorRole={} actorHotelId={} actorAgencyId={} reservationId={} reason=not_found",
-        ReservationRbacLog.EVENT_UPDATE_NOT_FOUND,
+        notFoundEvent,
         actor.userId(),
         actor.role(),
         actor.hotelId(),
@@ -69,6 +113,10 @@ public class ReservationCommandService {
     }
 
     return rows.getFirst();
+  }
+
+  private ReservationScope loadScope(UUID reservationId, RequestActor actor) {
+    return loadScope(reservationId, actor, ReservationRbacLog.EVENT_UPDATE_NOT_FOUND);
   }
 
   private void enforceUpdateAccess(RequestActor actor, ReservationScope scope) {
@@ -84,11 +132,24 @@ public class ReservationCommandService {
     }
   }
 
+  private void enforceCommentAccess(RequestActor actor, ReservationScope scope) {
+    Consumer<String> onDeny = reason -> deny(actor, scope.id(), ReservationRbacLog.EVENT_COMMENT_FORBIDDEN, reason);
+    switch (actor.role()) {
+      case MANAGER, RECEPTIONIST -> ReservationRbacGuards.requireHotelScope(actor, scope.hotelId(), onDeny);
+      case AGENCY -> onDeny.accept(ReservationRbacLog.REASON_COMMENTS_INTERNAL_ONLY);
+      default -> onDeny.accept(ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
+    }
+  }
+
   private void deny(RequestActor actor, UUID reservationId, String reason) {
+    deny(actor, reservationId, ReservationRbacLog.EVENT_UPDATE_FORBIDDEN, reason);
+  }
+
+  private void deny(RequestActor actor, UUID reservationId, String event, String reason) {
     log.warn(
       "{}",
       ReservationRbacLog.fields(
-        ReservationRbacLog.EVENT_UPDATE_FORBIDDEN,
+        event,
         actor,
         reservationId,
         "DENY",
@@ -96,6 +157,10 @@ public class ReservationCommandService {
       )
     );
     throw new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden reservation scope");
+  }
+
+  private OffsetDateTime toOffsetDateTime(Timestamp timestamp) {
+    return timestamp == null ? null : timestamp.toInstant().atOffset(ZoneOffset.UTC);
   }
 
   private record ReservationScope(UUID id, UUID hotelId, UUID agencyId, UUID createdByUserId) {

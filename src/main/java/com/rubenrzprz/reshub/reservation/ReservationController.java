@@ -9,9 +9,12 @@ import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
 
 @Tag(name = "Reservations", description = "Reservation read operations")
 @RestController
@@ -64,5 +67,25 @@ public class ReservationController {
   ) {
     RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
     return reservationCommandService.updateNotes(id, request.notes(), actor);
+  }
+
+  @Operation(summary = "Create internal reservation comment")
+  @ApiResponse(responseCode = "201", description = "Comment created and authorized")
+  @ApiResponse(responseCode = "400", description = "Invalid comment payload")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope/policy")
+  @ApiResponse(responseCode = "404", description = "Reservation not found")
+  @PostMapping("/reservations/{id}/comments")
+  @ResponseStatus(HttpStatus.CREATED)
+  public ReservationCommentView addComment(
+    @PathVariable UUID id,
+    @RequestBody ReservationCommentCreateRequest request,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    return reservationCommandService.addComment(id, request.body(), actor);
   }
 }
