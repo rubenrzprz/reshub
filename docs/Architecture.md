@@ -189,7 +189,7 @@
 * `hotel_id UUID NOT NULL REFERENCES hotel(id) ON DELETE RESTRICT`
 * `agency_id UUID NOT NULL REFERENCES agency(id) ON DELETE RESTRICT`
 * `created_by_user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE RESTRICT`
-* `room_type_id UUID NULL REFERENCES room_type(id) ON DELETE RESTRICT` *(nullable for late binding)*
+* `room_type_id UUID NULL` *(nullable for late binding)*
 * `external_room_type_code VARCHAR(64) NULL` *(required at API for AGENCY)*
 * `external_room_type_name VARCHAR(160) NULL`
 * `external_ref VARCHAR(64) NOT NULL` *(idempotency key)*
@@ -215,6 +215,10 @@
 **Uniqueness**
 
 * `UNIQUE (hotel_id, agency_id, external_ref)`
+
+**FK integrity**
+
+* `FOREIGN KEY (hotel_id, room_type_id) REFERENCES room_type(hotel_id, id) ON DELETE RESTRICT`
 
 **Indexes**
 
@@ -369,7 +373,7 @@
 
 ## 12) ❓ Open Questions
 
-* Do we need an **agency↔hotel authorization** join right away (flag off by default), or later? *(Planned V4; flag default false).*
+* Do we need an **agency↔hotel authorization** join right away (flag off by default), or later? *(Planned V5; flag default false).*
 * Add monetary fields (`total_amount_minor`, `currency`, tax semantics) when pricing enters scope? *(Deferred.)*
 * Any per-hotel **rate plans** to keep as external code only in MVP? *(Likely yes; defer modeling.)*
 
