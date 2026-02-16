@@ -102,7 +102,9 @@ class ReservationApiIT {
       .header("X-Role", "MANAGER")
       .header("X-Hotel-Id", UUID.randomUUID().toString())
       .exchange()
-      .expectStatus().isForbidden();
+      .expectStatus().isForbidden()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("forbidden_scope");
   }
 
   @Test
@@ -119,7 +121,9 @@ class ReservationApiIT {
   void missingActorHeadersIsUnauthorized() {
     client.get().uri("/reservations/{id}", reservationId)
       .exchange()
-      .expectStatus().isUnauthorized();
+      .expectStatus().isUnauthorized()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("unauthorized_actor_context");
   }
 
   @Test
@@ -129,7 +133,9 @@ class ReservationApiIT {
       .header("X-Role", "MANAGER")
       .header("X-Hotel-Id", seed.hotelId.toString())
       .exchange()
-      .expectStatus().isNotFound();
+      .expectStatus().isNotFound()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("reservation_not_found");
   }
 
   @Test
@@ -374,7 +380,9 @@ class ReservationApiIT {
       .header("X-Role", "MANAGER")
       .header("X-Hotel-Id", seed.hotelId.toString())
       .exchange()
-      .expectStatus().isEqualTo(409);
+      .expectStatus().isEqualTo(409)
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("invalid_status_transition");
   }
 
   @Test
@@ -474,7 +482,9 @@ class ReservationApiIT {
       .contentType(MediaType.APPLICATION_JSON)
       .bodyValue(payload)
       .exchange()
-      .expectStatus().isEqualTo(409);
+      .expectStatus().isEqualTo(409)
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("duplicate_external_ref");
   }
 
   @Test
@@ -504,7 +514,9 @@ class ReservationApiIT {
       .contentType(MediaType.APPLICATION_JSON)
       .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-no-actor"))
       .exchange()
-      .expectStatus().isUnauthorized();
+      .expectStatus().isUnauthorized()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("unauthorized_actor_context");
   }
 
   @Test
@@ -580,7 +592,9 @@ class ReservationApiIT {
       .header("X-Role", "MANAGER")
       .header("X-Hotel-Id", seed.hotelId.toString())
       .exchange()
-      .expectStatus().isBadRequest();
+      .expectStatus().isBadRequest()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("invalid_cursor");
   }
 
   @Test
@@ -590,7 +604,9 @@ class ReservationApiIT {
       .header("X-Role", "MANAGER")
       .header("X-Hotel-Id", seed.hotelId.toString())
       .exchange()
-      .expectStatus().isBadRequest();
+      .expectStatus().isBadRequest()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("invalid_limit");
   }
 
   @Test
