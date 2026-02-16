@@ -385,6 +385,129 @@ class ReservationApiIT {
   }
 
   @Test
+  void managerCanCreateReservationInOwnHotel() {
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-manager"))
+      .exchange()
+      .expectStatus().isCreated()
+      .expectBody()
+      .jsonPath("$.hotelId").isEqualTo(seed.hotelId.toString())
+      .jsonPath("$.agencyId").isEqualTo(seed.agencyId.toString())
+      .jsonPath("$.createdByUserId").isEqualTo(seed.managerUserId.toString())
+      .jsonPath("$.status").isEqualTo("NEW");
+  }
+
+  @Test
+  void managerCannotCreateReservationForOtherHotel() {
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createPayload(seed.otherHotelId, seed.agencyId, "ext-create-manager-forbidden"))
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
+  @Test
+  void receptionistCanCreateReservationInOwnHotel() {
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.receptionistUserId.toString())
+      .header("X-Role", "RECEPTIONIST")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-reception"))
+      .exchange()
+      .expectStatus().isCreated()
+      .expectBody()
+      .jsonPath("$.createdByUserId").isEqualTo(seed.receptionistUserId.toString());
+  }
+
+  @Test
+  void agencyCanCreateReservationForOwnAgency() {
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", seed.agencyId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-agency"))
+      .exchange()
+      .expectStatus().isCreated()
+      .expectBody()
+      .jsonPath("$.agencyId").isEqualTo(seed.agencyId.toString())
+      .jsonPath("$.createdByUserId").isEqualTo(seed.agencyUserId.toString());
+  }
+
+  @Test
+  void agencyCannotCreateReservationForOtherAgency() {
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", seed.agencyId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createPayload(seed.hotelId, seed.otherAgencyId, "ext-create-agency-forbidden"))
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
+  @Test
+  void duplicateExternalReferenceReturnsConflict() {
+    Map<String, Object> payload = createPayload(seed.hotelId, seed.agencyId, "ext-create-dup");
+
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(payload)
+      .exchange()
+      .expectStatus().isCreated();
+
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(payload)
+      .exchange()
+      .expectStatus().isEqualTo(409);
+  }
+
+  @Test
+  void invalidCreatePayloadReturnsBadRequest() {
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of(
+        "hotelId", seed.hotelId.toString(),
+        "agencyId", seed.agencyId.toString(),
+        "externalRef", "ext-create-invalid",
+        "arrivalDate", "2026-02-25",
+        "departureDate", "2026-02-25",
+        "guestName", "Bad Payload Guest",
+        "adults", 1,
+        "children", 0
+      ))
+      .exchange()
+      .expectStatus().isBadRequest();
+  }
+
+  @Test
+  void createMissingActorHeadersIsUnauthorized() {
+    client.post().uri("/reservations")
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-no-actor"))
+      .exchange()
+      .expectStatus().isUnauthorized();
+  }
+
+  @Test
   void managerListIsScopedToOwnHotel() {
     insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 21));
     insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "NEW", LocalDate.of(2026, 2, 22));
@@ -492,6 +615,20 @@ class ReservationApiIT {
 
   private UUID insertReservation(Seed s) {
     return insertReservation(s, s.receptionistUserId);
+  }
+
+  private Map<String, Object> createPayload(UUID hotelId, UUID agencyId, String externalRef) {
+    return Map.of(
+      "hotelId", hotelId.toString(),
+      "agencyId", agencyId.toString(),
+      "externalRef", externalRef,
+      "arrivalDate", "2026-02-25",
+      "departureDate", "2026-02-27",
+      "guestName", "Create Payload Guest",
+      "adults", 2,
+      "children", 0,
+      "notes", "Created via API test"
+    );
   }
 
   private UUID insertReservation(Seed s, UUID createdByUserId) {
