@@ -286,6 +286,99 @@ class ReservationApiIT {
       .expectStatus().isNotFound();
   }
 
+  @Test
+  void managerCanConfirmReservationInOwnHotel() {
+    client.post().uri("/reservations/{id}/confirm", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.status").isEqualTo("CONFIRMED");
+
+    Assertions.assertEquals("CONFIRMED", loadStatus(reservationId));
+  }
+
+  @Test
+  void receptionistCanCancelOwnReservation() {
+    client.post().uri("/reservations/{id}/cancel", reservationId)
+      .header("X-User-Id", seed.receptionistUserId.toString())
+      .header("X-Role", "RECEPTIONIST")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("reason", "guest requested"))
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.status").isEqualTo("CANCELLED");
+
+    Assertions.assertEquals("CANCELLED", loadStatus(reservationId));
+    Assertions.assertNotNull(loadCancelledAt(reservationId));
+  }
+
+  @Test
+  void receptionistCannotChangeStatusForReservationCreatedByAnotherUser() {
+    UUID managerCreatedReservation = insertReservation(seed, seed.managerUserId);
+
+    client.post().uri("/reservations/{id}/cancel", managerCreatedReservation)
+      .header("X-User-Id", seed.receptionistUserId.toString())
+      .header("X-Role", "RECEPTIONIST")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("reason", "forbidden"))
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
+  @Test
+  void agencyCanMarkOwnReservationAsNoShow() {
+    client.post().uri("/reservations/{id}/noshow", reservationId)
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", seed.agencyId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.status").isEqualTo("NOSHOW");
+
+    Assertions.assertEquals("NOSHOW", loadStatus(reservationId));
+  }
+
+  @Test
+  void agencyCannotChangeStatusForOtherAgencyReservation() {
+    client.post().uri("/reservations/{id}/confirm", reservationId)
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", UUID.randomUUID().toString())
+      .exchange()
+      .expectStatus().isForbidden();
+  }
+
+  @Test
+  void invalidStatusTransitionReturnsConflict() {
+    client.post().uri("/reservations/{id}/confirm", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk();
+
+    client.post().uri("/reservations/{id}/confirm", reservationId)
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isEqualTo(409);
+  }
+
+  @Test
+  void statusActionMissingActorHeadersIsUnauthorized() {
+    client.post().uri("/reservations/{id}/confirm", reservationId)
+      .exchange()
+      .expectStatus().isUnauthorized();
+  }
+
   private UUID insertReservation(Seed s) {
     return insertReservation(s, s.receptionistUserId);
   }
@@ -368,6 +461,22 @@ class ReservationApiIT {
       reservationId
     );
     Assertions.assertEquals(expected, count);
+  }
+
+  private String loadStatus(UUID reservationId) {
+    return jdbc.queryForObject(
+      "select status from reservation where id = ?",
+      String.class,
+      reservationId
+    );
+  }
+
+  private Object loadCancelledAt(UUID reservationId) {
+    return jdbc.queryForObject(
+      "select cancelled_at from reservation where id = ?",
+      Object.class,
+      reservationId
+    );
   }
 
   private record Seed(
