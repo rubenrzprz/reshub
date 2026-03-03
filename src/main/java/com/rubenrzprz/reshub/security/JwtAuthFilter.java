@@ -35,6 +35,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
     String path = request.getRequestURI();
+    String contextPath = request.getContextPath();
+    if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
+      path = path.substring(contextPath.length());
+    }
     // Only reservations are protected for now
     return !path.startsWith("/reservations");
   }
