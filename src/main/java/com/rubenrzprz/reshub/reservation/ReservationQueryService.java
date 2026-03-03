@@ -67,7 +67,15 @@ public class ReservationQueryService {
     return reservation;
   }
 
-  public ReservationListResponse list(RequestActor actor, int limit, String cursor, String status) {
+  public ReservationListResponse list(
+    RequestActor actor,
+    int limit,
+    String cursor,
+    String status,
+    LocalDate arrivalFrom,
+    LocalDate arrivalTo,
+    String guestQuery
+  ) {
     CursorKey cursorKey = parseCursor(cursor);
 
     List<Object> args = new ArrayList<>();
@@ -92,6 +100,28 @@ public class ReservationQueryService {
     if (status != null && !status.isBlank()) {
       sql.append("and status = ? ");
       args.add(status);
+    }
+
+    if (arrivalFrom != null) {
+      sql.append("and arrival_date >= ? ");
+      args.add(Date.valueOf(arrivalFrom));
+    }
+
+    if (arrivalTo != null) {
+      sql.append("and arrival_date <= ? ");
+      args.add(Date.valueOf(arrivalTo));
+    }
+
+    if (guestQuery != null && !guestQuery.isBlank()) {
+      String guestPattern = "%" + guestQuery.trim().toLowerCase() + "%";
+      sql.append("and (");
+      sql.append("lower(guest_name) like ? ");
+      sql.append("or lower(coalesce(guest_email, '')) like ? ");
+      sql.append("or lower(coalesce(guest_phone, '')) like ? ");
+      sql.append(") ");
+      args.add(guestPattern);
+      args.add(guestPattern);
+      args.add(guestPattern);
     }
 
     if (cursorKey != null) {
