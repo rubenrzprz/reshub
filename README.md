@@ -28,7 +28,7 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 ---
 
 ## ✨ Features
-- 🔐 Role-based access control for **MANAGER**, **RECEPTIONIST**, **AGENCY**
+- 🔐 Role-based access control for **ADMIN**, **MANAGER**, **RECEPTIONIST**, **AGENCY**
 - 🔎 Search by date range, status, and free-text guest; pagination & sorting
 - 📤 CSV/JSON export of filtered results
 - 🧭 Idempotent `externalRef` per (hotel, agency)

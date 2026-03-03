@@ -77,6 +77,7 @@ public class ReservationQueryService {
     );
 
     switch (actor.role()) {
+      case ADMIN -> sql.append("1 = 1 ");
       case MANAGER, RECEPTIONIST -> {
         sql.append("hotel_id = ? ");
         args.add(actor.hotelId());
@@ -143,6 +144,8 @@ public class ReservationQueryService {
   private void enforceReadAccess(RequestActor actor, ReservationView reservation) {
     Consumer<String> onDeny = reason -> deny(actor, reservation.id(), reason);
     switch (actor.role()) {
+      case ADMIN -> {
+      }
       case MANAGER, RECEPTIONIST -> ReservationRbacGuards.requireHotelScope(actor, reservation.hotelId(), onDeny);
       case AGENCY -> ReservationRbacGuards.requireAgencyScope(actor, reservation.agencyId(), onDeny);
       default -> onDeny.accept(ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
