@@ -112,6 +112,13 @@ mvn -q test
 * Integration tests that hit PostgreSQL use **Testcontainers**.
 * The test suite verifies that the baseline database schema is applied.
 
+### 📤 Export Endpoints
+
+Use the same role-scoped filters as `GET /reservations`:
+
+* JSON: `GET /reservations/export?status=&arrivalFrom=&arrivalTo=&guestQuery=`
+* CSV: `GET /reservations/export.csv?status=&arrivalFrom=&arrivalTo=&guestQuery=`
+
 ---
 
 ## 🗺️ Milestones
