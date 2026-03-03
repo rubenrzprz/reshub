@@ -27,7 +27,7 @@ public class AuthService {
     validateRequest(request);
 
     AuthUser user = findByEmail(request.email());
-    if(!passwordEncoder.matches(request.password(), user.passwordHash())) {
+    if (!passwordEncoder.matches(request.password(), user.passwordHash())) {
       throw invalidCredentials();
     }
 
@@ -36,10 +36,10 @@ public class AuthService {
   }
 
   private void validateRequest(TokenRequest request) {
-    if(request == null ||
-    request.email() == null || request.email().isBlank() ||
-    request.password() == null || request.password().isBlank()) {
-      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_auth_paylooad", "email and password are required");
+    if (request == null ||
+      request.email() == null || request.email().isBlank() ||
+      request.password() == null || request.password().isBlank()) {
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_auth_payload", "email and password are required");
     }
   }
 
@@ -59,7 +59,7 @@ public class AuthService {
       normalized
     );
 
-    if(rows.isEmpty()) {
+    if (rows.isEmpty()) {
       throw invalidCredentials();
     }
 
@@ -67,7 +67,7 @@ public class AuthService {
   }
 
   private ApiProblemException invalidCredentials() {
-    return new ApiProblemException(HttpStatus.UNAUTHORIZED, "invalid_credentails", "invalid credentials");
+    return new ApiProblemException(HttpStatus.UNAUTHORIZED, "invalid_credentials", "invalid credentials");
   }
 
 }
