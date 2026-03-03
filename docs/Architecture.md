@@ -61,6 +61,7 @@
 - **MANAGER** — hotel-wide access within their hotel.
 - **RECEPTIONIST** — CRUD on own-created reservations; may comment on any reservation in their hotel.
 - **AGENCY** — CRUD only on reservations created by that agency; cannot post comments after creation (may include a one-time `notes` at create).
+- **ADMIN** — global cross-tenant reservation/comment access for support and operational recovery.
 
 (Enforcement in service/API layer with standardized `ProblemDetail` codes; DB encodes integrity + lifecycle constraints.)
 
@@ -112,7 +113,7 @@
 - `id UUID PK`
 - `email VARCHAR(254) UNIQUE NOT NULL` *(lower-cased by app)*
 - `password_hash VARCHAR(72) NOT NULL` *(BCrypt)*
-- `role VARCHAR(24) NOT NULL` *(MANAGER | RECEPTIONIST | AGENCY)*
+- `role VARCHAR(24) NOT NULL` *(ADMIN | MANAGER | RECEPTIONIST | AGENCY)*
 - `hotel_id UUID NULL REFERENCES hotel(id) ON DELETE RESTRICT`
 - `agency_id UUID NULL REFERENCES agency(id) ON DELETE RESTRICT`
 - `CHECK ((hotel_id IS NULL) <> (agency_id IS NULL))`
@@ -239,7 +240,7 @@
 
 **Policy**
 
-* Post-creation comments allowed only for MANAGER/RECEPTIONIST; agencies cannot comment post-create.
+* Post-creation comments allowed for ADMIN/MANAGER/RECEPTIONIST; agencies cannot comment post-create.
 
 ---
 
@@ -289,9 +290,11 @@
 * **Idempotency**: `(hotel_id, agency_id, external_ref)` uniquely identifies an external booking attempt.
 * **RBAC** (service/API layer):
 
+  * ADMIN: global cross-tenant read/write access for reservations/comments.
   * AGENCY: own reservations only; no post-create comments.
   * RECEPTIONIST: CRUD own; comment any in hotel.
   * MANAGER: hotel-wide.
+* **Audit**: successful ADMIN write operations emit structured audit logs with actor, action, target id, and timestamp.
 * **Room mapping**:
 
   * AGENCY create: **require** `external_room_type_code`; resolve `room_type_id` via mapping; if not found, store external fields and **late bind**.
@@ -348,6 +351,7 @@
 
 * **AGENCY create**: require `external_room_type_code`; optional `external_room_type_name`. Attempt mapping; late bind if unresolved.
 * **STAFF create**: require `room_type_id` (must belong to the same `hotel_id`).
+* **ADMIN access**: may read/write reservations and comments across all hotels/agencies.
 * **List endpoint**: `GET /reservations` uses keyset pagination ordered by `(arrival_date ASC, id ASC)`.
 * **ProblemDetail** codes to standardize:
 

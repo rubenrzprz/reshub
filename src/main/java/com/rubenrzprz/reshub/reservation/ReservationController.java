@@ -18,7 +18,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.HttpStatus;
 
-@Tag(name = "Reservations", description = "Reservation read operations")
+@Tag(
+  name = "Reservations",
+  description = "Role-scoped reservation API. ADMIN has global cross-tenant access; other roles remain tenant scoped."
+)
 @RestController
 public class ReservationController {
 
