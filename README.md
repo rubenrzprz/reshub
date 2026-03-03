@@ -28,6 +28,7 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 ---
 
 ## ✨ Features
+- 🔑 JWT authentication (`/auth/token`) with bearer-protected reservation endpoints
 - 🔐 Role-based access control for **ADMIN**, **MANAGER**, **RECEPTIONIST**, **AGENCY**
 - 🔎 Search by date range, status, and free-text guest; pagination & sorting
 - 📤 CSV/JSON export of filtered results
@@ -112,6 +113,28 @@ mvn -q test
 * Integration tests that hit PostgreSQL use **Testcontainers**.
 * The test suite verifies that the baseline database schema is applied.
 
+### 🔐 Authentication (JWT)
+
+1. Request a token:
+
+```bash
+curl -X POST http://localhost:8080/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<user-email>","password":"<user-password>"}'
+```
+
+2. Use the `accessToken` value as bearer token:
+
+```bash
+curl http://localhost:8080/reservations \
+  -H "Authorization: Bearer <accessToken>"
+```
+
+#### 📌 Notes
+
+* Reservation endpoints use bearer authentication.
+* Legacy actor headers (`X-User-Id`, `X-Role`, `X-Hotel-Id`, `X-Agency-Id`) are disabled.
+
 ### 📤 Export Endpoints
 
 Use the same role-scoped filters as `GET /reservations`:
@@ -126,7 +149,7 @@ Use the same role-scoped filters as `GET /reservations`:
 * [x] Bootstrap application with `/health` and Swagger UI
 * [x] CI for PRs and `main` (build + tests)
 * [x] Database baseline (PostgreSQL + Flyway)
-* [ ] Auth (JWT) + token issuance
+* [x] Auth (JWT) + token issuance
 * [x] Roles enforcement (service/API scope checks)
 * [x] Reservations CRUD + list pagination (RBAC-scoped)
 * [x] Integration tests (Testcontainers)
