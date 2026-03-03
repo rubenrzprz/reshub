@@ -281,7 +281,23 @@ public class ReservationController {
     if (value == null) {
       return "\"\"";
     }
-    String escaped = value.toString().replace("\"", "\"\"");
+    String sanitized = sanitizeCsvFormula(value.toString());
+    String escaped = sanitized.replace("\"", "\"\"");
     return "\"" + escaped + "\"";
+  }
+
+  private String sanitizeCsvFormula(String value) {
+    if (value.isEmpty()) {
+      return value;
+    }
+    String trimmedLeading = value.stripLeading();
+    if (trimmedLeading.isEmpty()) {
+      return value;
+    }
+    char firstChar = trimmedLeading.charAt(0);
+    if (firstChar == '=' || firstChar == '+' || firstChar == '-' || firstChar == '@') {
+      return "'" + value;
+    }
+    return value;
   }
 }

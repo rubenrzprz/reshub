@@ -1089,6 +1089,34 @@ class ReservationApiIT {
       .jsonPath("$.code").isEqualTo("invalid_date_range");
   }
 
+  @Test
+  void csvExportNeutralizesFormulaLikeCells() {
+    UUID formulaReservationId = insertReservationWithGuest(
+      seed,
+      seed.hotelId,
+      seed.agencyId,
+      seed.managerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 21),
+      "=2+2",
+      "formula@example.com",
+      "+34111111111"
+    );
+    jdbc.update("update reservation set notes = ? where id = ?", "@cmd", formulaReservationId);
+
+    client.get().uri("/reservations/export.csv")
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody(String.class)
+      .value(body -> {
+        Assertions.assertTrue(body.contains("\"'=2+2\""));
+        Assertions.assertTrue(body.contains("\"'@cmd\""));
+      });
+  }
+
   private UUID insertReservation(Seed s) {
     return insertReservation(s, s.receptionistUserId);
   }
