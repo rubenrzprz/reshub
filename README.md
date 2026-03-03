@@ -86,13 +86,15 @@ One command builds and runs the complete development stack:
 cp .env.example .env
 ```
 
-2. Build & start the stack:
+2) Set a strong JWT signing secret in `.env` (`JWT_SECRET`, min 32 chars).
+
+3) Build & start the stack:
 
 ```bash
 docker compose up --build
 ```
 
-3. Verify:
+4) Verify:
 
 * Health: **[http://localhost:8080/health](http://localhost:8080/health)** → `200`
 * Swagger UI: **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
@@ -102,6 +104,7 @@ docker compose up --build
 * On startup, **Flyway automatically applies database migrations**.
 * The API runs with the `dev` profile when started via Docker Compose.
 * If port `8080` is busy, set `APP_PORT=8081` in `.env` and re-run.
+* `JWT_SECRET` is required; startup fails if missing/weak.
 * Stop with `Ctrl + C` (foreground) or `docker compose down`.
 
 ### 🧪 Tests

@@ -19,7 +19,7 @@ import java.io.IOException;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-  private static final String BEARER_PREFIX = "Bearer ";
+  private static final int BEARER_PREFIX_LENGTH = 7; // "Bearer "
 
   private final JwtService jwtService;
   private final HandlerExceptionResolver resolver;
@@ -46,18 +46,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     FilterChain filterChain
   ) throws ServletException, IOException {
     try {
-      String authHeader = request.getHeader("Authorization");
-
-      if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-        throw new ApiProblemException(
-          HttpStatus.UNAUTHORIZED,
-          "unauthorized_actor_context",
-          "missing bearer token"
-        );
-      }
-
-      String token = authHeader.substring(BEARER_PREFIX.length()).trim();
-      if (token.isBlank()) {
+      String token = extractBearerToken(request.getHeader("Authorization"));
+      if (token == null) {
         throw new ApiProblemException(
           HttpStatus.UNAUTHORIZED,
           "unauthorized_actor_context",
@@ -90,6 +80,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         new ApiProblemException(HttpStatus.UNAUTHORIZED, "unauthorized_actor_context", "invalid bearer token")
       );
     }
+  }
+
+  private String extractBearerToken(String authHeader) {
+    if (authHeader == null || authHeader.length() <= BEARER_PREFIX_LENGTH) {
+      return null;
+    }
+    if (!authHeader.regionMatches(true, 0, "Bearer ", 0, BEARER_PREFIX_LENGTH)) {
+      return null;
+    }
+    String token = authHeader.substring(BEARER_PREFIX_LENGTH).trim();
+    return token.isBlank() ? null : token;
   }
 
 }

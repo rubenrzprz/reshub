@@ -7,7 +7,7 @@ server:
 
 security:
   jwt:
-    secret: "change-me-in-real-env-minimum-32-chars"
+    secret: "${JWT_SECRET:}"
     issuer: "reshub"
     expiration-minutes: 60
     allow-legacy-headers: false

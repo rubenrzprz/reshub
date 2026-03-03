@@ -131,6 +131,17 @@ class AuthApiIT {
   }
 
   @Test
+  void lowercaseBearerSchemeAllowsProtectedAccess() {
+    String token = issueToken(seed.managerEmail, VALID_PASSWORD);
+    client.get().uri("/reservations/{id}", reservationId)
+      .header("Authorization", "bearer " + token)
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.id").isEqualTo(reservationId.toString());
+  }
+
+  @Test
   void validBearerStillEnforcesScope() {
     UUID otherReservation = insertReservation(
       seed,
