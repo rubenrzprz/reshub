@@ -5,3 +5,10 @@ spring:
 logging:
   level:
     com.rubenrzprz.reshub: DEBUG
+
+security:
+  jwt:
+    secret: "test-secret-key-with-at-least-32-characters"
+    issuer: "reshub-test"
+    expiration-minutes: 60
+    allow-legacy-headers: true

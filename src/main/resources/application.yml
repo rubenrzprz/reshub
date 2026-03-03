@@ -4,3 +4,10 @@ spring:
 
 server:
   port: 8080
+
+security:
+  jwt:
+    secret: "change-me-in-real-env-minimum-32-chars"
+    issuer: "reshub"
+    expiration-minutes: 60
+    allow-legacy-headers: false
