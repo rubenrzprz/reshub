@@ -49,6 +49,7 @@ public class ReservationCommandService {
         "scope_match"
       )
     );
+    emitAdminWriteAudit(actor, reservationId, "update_notes");
     return reservationQueryService.getById(reservationId, actor);
   }
 
@@ -121,6 +122,7 @@ public class ReservationCommandService {
         "scope_match"
       )
     );
+    emitAdminWriteAudit(actor, reservationId, "create_reservation");
     return reservationQueryService.getById(reservationId, actor);
   }
 
@@ -163,6 +165,7 @@ public class ReservationCommandService {
         "scope_match"
       )
     );
+    emitAdminWriteAudit(actor, reservationId, "create_comment");
 
     return jdbc.queryForObject(
       "select id, reservation_id, author_user_id, body, created_at from reservation_comment where id = ?",
@@ -213,6 +216,8 @@ public class ReservationCommandService {
   private void enforceMutationAccess(RequestActor actor, ReservationScope scope, String forbiddenEvent) {
     Consumer<String> onDeny = reason -> deny(actor, scope.id(), forbiddenEvent, reason);
     switch (actor.role()) {
+      case ADMIN -> {
+      }
       case MANAGER -> ReservationRbacGuards.requireHotelScope(actor, scope.hotelId(), onDeny);
       case RECEPTIONIST -> {
         ReservationRbacGuards.requireHotelScope(actor, scope.hotelId(), onDeny);
@@ -226,6 +231,8 @@ public class ReservationCommandService {
   private void enforceCreateAccess(RequestActor actor, ReservationCreateRequest request) {
     Consumer<String> onDeny = reason -> deny(actor, null, ReservationRbacLog.EVENT_CREATE_FORBIDDEN, reason);
     switch (actor.role()) {
+      case ADMIN -> {
+      }
       case MANAGER, RECEPTIONIST -> ReservationRbacGuards.requireHotelScope(actor, request.hotelId(), onDeny);
       case AGENCY -> ReservationRbacGuards.requireAgencyScope(actor, request.agencyId(), onDeny);
       default -> onDeny.accept(ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
@@ -267,6 +274,8 @@ public class ReservationCommandService {
   private void enforceCommentAccess(RequestActor actor, ReservationScope scope) {
     Consumer<String> onDeny = reason -> deny(actor, scope.id(), ReservationRbacLog.EVENT_COMMENT_FORBIDDEN, reason);
     switch (actor.role()) {
+      case ADMIN -> {
+      }
       case MANAGER, RECEPTIONIST -> ReservationRbacGuards.requireHotelScope(actor, scope.hotelId(), onDeny);
       case AGENCY -> onDeny.accept(ReservationRbacLog.REASON_COMMENTS_INTERNAL_ONLY);
       default -> onDeny.accept(ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
@@ -346,6 +355,7 @@ public class ReservationCommandService {
         "transition:" + scope.status() + "_to_" + targetStatus
       )
     );
+    emitAdminWriteAudit(actor, reservationId, "change_status_to_" + targetStatus);
     return reservationQueryService.getById(reservationId, actor);
   }
 
@@ -370,6 +380,12 @@ public class ReservationCommandService {
       );
     }
     return new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_reservation_payload", "invalid reservation payload");
+  }
+
+  private void emitAdminWriteAudit(RequestActor actor, UUID targetId, String action) {
+    if (actor.role() == RequestActor.Role.ADMIN) {
+      log.info("{}", ReservationRbacLog.adminWriteAuditFields(actor, targetId, action));
+    }
   }
 
   private record ReservationScope(UUID id, UUID hotelId, UUID agencyId, UUID createdByUserId, String status) {

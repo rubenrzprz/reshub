@@ -96,6 +96,28 @@ class ReservationApiIT {
   }
 
   @Test
+  void adminCanReadReservationAcrossHotels() {
+    UUID otherReservationId = insertReservation(
+      seed,
+      seed.otherHotelId,
+      seed.otherAgencyId,
+      seed.otherManagerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 21)
+    );
+
+    client.get().uri("/reservations/{id}", otherReservationId)
+      .header("X-User-Id", seed.adminUserId.toString())
+      .header("X-Role", "ADMIN")
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.id").isEqualTo(otherReservationId.toString())
+      .jsonPath("$.hotelId").isEqualTo(seed.otherHotelId.toString())
+      .jsonPath("$.agencyId").isEqualTo(seed.otherAgencyId.toString());
+  }
+
+  @Test
   void managerCannotReadReservationFromOtherHotel() {
     client.get().uri("/reservations/{id}", reservationId)
       .header("X-User-Id", UUID.randomUUID().toString())
@@ -150,6 +172,28 @@ class ReservationApiIT {
       .expectStatus().isOk()
       .expectBody()
       .jsonPath("$.notes").isEqualTo("manager update");
+  }
+
+  @Test
+  void adminCanUpdateNotesAcrossHotels() {
+    UUID otherReservationId = insertReservation(
+      seed,
+      seed.otherHotelId,
+      seed.otherAgencyId,
+      seed.otherManagerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 21)
+    );
+
+    client.patch().uri("/reservations/{id}/notes", otherReservationId)
+      .header("X-User-Id", seed.adminUserId.toString())
+      .header("X-Role", "ADMIN")
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("notes", "admin cross-tenant update"))
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.notes").isEqualTo("admin cross-tenant update");
   }
 
   @Test
@@ -237,6 +281,32 @@ class ReservationApiIT {
   }
 
   @Test
+  void adminCanCreateCommentAcrossHotels() {
+    UUID otherReservationId = insertReservation(
+      seed,
+      seed.otherHotelId,
+      seed.otherAgencyId,
+      seed.otherManagerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 21)
+    );
+
+    client.post().uri("/reservations/{id}/comments", otherReservationId)
+      .header("X-User-Id", seed.adminUserId.toString())
+      .header("X-Role", "ADMIN")
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("body", "admin cross-tenant comment"))
+      .exchange()
+      .expectStatus().isCreated()
+      .expectBody()
+      .jsonPath("$.reservationId").isEqualTo(otherReservationId.toString())
+      .jsonPath("$.authorUserId").isEqualTo(seed.adminUserId.toString())
+      .jsonPath("$.body").isEqualTo("admin cross-tenant comment");
+
+    assertCommentCount(otherReservationId, 1);
+  }
+
+  @Test
   void receptionistCanCreateInternalCommentInOwnHotel() {
     client.post().uri("/reservations/{id}/comments", reservationId)
       .header("X-User-Id", seed.receptionistUserId.toString())
@@ -309,6 +379,28 @@ class ReservationApiIT {
       .jsonPath("$.status").isEqualTo("CONFIRMED");
 
     Assertions.assertEquals("CONFIRMED", loadStatus(reservationId));
+  }
+
+  @Test
+  void adminCanChangeStatusAcrossHotels() {
+    UUID otherReservationId = insertReservation(
+      seed,
+      seed.otherHotelId,
+      seed.otherAgencyId,
+      seed.otherManagerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 21)
+    );
+
+    client.post().uri("/reservations/{id}/confirm", otherReservationId)
+      .header("X-User-Id", seed.adminUserId.toString())
+      .header("X-Role", "ADMIN")
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.status").isEqualTo("CONFIRMED");
+
+    Assertions.assertEquals("CONFIRMED", loadStatus(otherReservationId));
   }
 
   @Test
@@ -406,6 +498,22 @@ class ReservationApiIT {
       .jsonPath("$.hotelId").isEqualTo(seed.hotelId.toString())
       .jsonPath("$.agencyId").isEqualTo(seed.agencyId.toString())
       .jsonPath("$.createdByUserId").isEqualTo(seed.managerUserId.toString())
+      .jsonPath("$.status").isEqualTo("NEW");
+  }
+
+  @Test
+  void adminCanCreateReservationAcrossHotels() {
+    client.post().uri("/reservations")
+      .header("X-User-Id", seed.adminUserId.toString())
+      .header("X-Role", "ADMIN")
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createPayload(seed.otherHotelId, seed.otherAgencyId, "ext-create-admin"))
+      .exchange()
+      .expectStatus().isCreated()
+      .expectBody()
+      .jsonPath("$.hotelId").isEqualTo(seed.otherHotelId.toString())
+      .jsonPath("$.agencyId").isEqualTo(seed.otherAgencyId.toString())
+      .jsonPath("$.createdByUserId").isEqualTo(seed.adminUserId.toString())
       .jsonPath("$.status").isEqualTo("NEW");
   }
 
@@ -559,6 +667,21 @@ class ReservationApiIT {
       .jsonPath("$.items.length()").isEqualTo(2)
       .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString())
       .jsonPath("$.items[1].hotelId").isEqualTo(seed.hotelId.toString());
+  }
+
+  @Test
+  void adminListCanIncludeMultipleHotels() {
+    insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "NEW", LocalDate.of(2026, 2, 21));
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 50).build())
+      .header("X-User-Id", seed.adminUserId.toString())
+      .header("X-Role", "ADMIN")
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(2)
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString())
+      .jsonPath("$.items[1].hotelId").isEqualTo(seed.otherHotelId.toString());
   }
 
   @Test
@@ -727,6 +850,16 @@ class ReservationApiIT {
       hotelId
     );
 
+    UUID adminUserId = UUID.randomUUID();
+    jdbc.update(
+      "insert into app_user (id, email, password_hash, role, hotel_id) values (?, ?, ?, ?, ?)",
+      adminUserId,
+      "admin-" + adminUserId.toString().substring(0, 8) + "@example.com",
+      "hash",
+      "ADMIN",
+      hotelId
+    );
+
     UUID receptionistUserId = UUID.randomUUID();
     jdbc.update(
       "insert into app_user (id, email, password_hash, role, hotel_id) values (?, ?, ?, ?, ?)",
@@ -782,6 +915,7 @@ class ReservationApiIT {
     return new Seed(
       hotelId,
       agencyId,
+      adminUserId,
       managerUserId,
       receptionistUserId,
       agencyUserId,
@@ -824,6 +958,7 @@ class ReservationApiIT {
   private record Seed(
     UUID hotelId,
     UUID agencyId,
+    UUID adminUserId,
     UUID managerUserId,
     UUID receptionistUserId,
     UUID agencyUserId,

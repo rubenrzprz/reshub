@@ -9,6 +9,7 @@ public record RequestActor(
   UUID agencyId
 ) {
   public enum Role {
+    ADMIN,
     MANAGER,
     RECEPTIONIST,
     AGENCY
