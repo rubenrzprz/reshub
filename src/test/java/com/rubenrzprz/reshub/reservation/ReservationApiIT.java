@@ -777,8 +777,214 @@ class ReservationApiIT {
       .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString());
   }
 
+  @Test
+  void arrivalDateRangeFilterAppliesWithinManagerScope() {
+    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 18));
+    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 23));
+    insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "NEW", LocalDate.of(2026, 2, 22));
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
+      .queryParam("arrivalFrom", "2026-02-20")
+      .queryParam("arrivalTo", "2026-02-22")
+      .queryParam("limit", 50)
+      .build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(1)
+      .jsonPath("$.items[0].arrivalDate").isEqualTo("2026-02-20")
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString());
+  }
+
+  @Test
+  void guestQueryFiltersByNameWithinManagerScope() {
+    insertReservationWithGuest(
+      seed,
+      seed.hotelId,
+      seed.agencyId,
+      seed.managerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 21),
+      "Alice Smith",
+      "alice@example.com",
+      "+34111111111"
+    );
+    insertReservationWithGuest(
+      seed,
+      seed.hotelId,
+      seed.agencyId,
+      seed.managerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 22),
+      "Bob Johnson",
+      "bob@example.com",
+      "+34222222222"
+    );
+    insertReservationWithGuest(
+      seed,
+      seed.otherHotelId,
+      seed.otherAgencyId,
+      seed.otherManagerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 22),
+      "Alice Outside",
+      "outside@example.com",
+      "+34333333333"
+    );
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
+      .queryParam("guestQuery", "smith")
+      .queryParam("limit", 50)
+      .build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(1)
+      .jsonPath("$.items[0].guestName").isEqualTo("Alice Smith")
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString());
+  }
+
+  @Test
+  void guestQueryCanMatchEmailWithinAgencyScope() {
+    insertReservationWithGuest(
+      seed,
+      seed.hotelId,
+      seed.agencyId,
+      seed.agencyUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 21),
+      "Agency Match",
+      "match@agency.com",
+      "+34111111111"
+    );
+    insertReservationWithGuest(
+      seed,
+      seed.hotelId,
+      seed.otherAgencyId,
+      seed.otherAgencyUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 22),
+      "Other Agency Match",
+      "match@agency.com",
+      "+34222222222"
+    );
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
+      .queryParam("guestQuery", "MATCH@AGENCY.COM")
+      .queryParam("limit", 50)
+      .build())
+      .header("X-User-Id", seed.agencyUserId.toString())
+      .header("X-Role", "AGENCY")
+      .header("X-Agency-Id", seed.agencyId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(1)
+      .jsonPath("$.items[0].agencyId").isEqualTo(seed.agencyId.toString())
+      .jsonPath("$.items[0].guestName").isEqualTo("Agency Match");
+  }
+
+  @Test
+  void combinedStatusDateAndGuestFiltersReturnIntersection() {
+    insertReservationWithGuest(
+      seed,
+      seed.hotelId,
+      seed.agencyId,
+      seed.managerUserId,
+      "CONFIRMED",
+      LocalDate.of(2026, 2, 21),
+      "Alice Combined",
+      "alice-combined@example.com",
+      "+34111111111"
+    );
+    insertReservationWithGuest(
+      seed,
+      seed.hotelId,
+      seed.agencyId,
+      seed.managerUserId,
+      "NEW",
+      LocalDate.of(2026, 2, 21),
+      "Alice Wrong Status",
+      "alice-wrong@example.com",
+      "+34222222222"
+    );
+    insertReservationWithGuest(
+      seed,
+      seed.hotelId,
+      seed.agencyId,
+      seed.managerUserId,
+      "CONFIRMED",
+      LocalDate.of(2026, 2, 25),
+      "Alice Wrong Date",
+      "alice-date@example.com",
+      "+34333333333"
+    );
+
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
+      .queryParam("status", "CONFIRMED")
+      .queryParam("arrivalFrom", "2026-02-20")
+      .queryParam("arrivalTo", "2026-02-22")
+      .queryParam("guestQuery", "alice")
+      .queryParam("limit", 50)
+      .build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+      .jsonPath("$.items.length()").isEqualTo(1)
+      .jsonPath("$.items[0].status").isEqualTo("CONFIRMED")
+      .jsonPath("$.items[0].arrivalDate").isEqualTo("2026-02-21")
+      .jsonPath("$.items[0].guestName").isEqualTo("Alice Combined");
+  }
+
+  @Test
+  void invalidDateRangeIsBadRequest() {
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
+      .queryParam("arrivalFrom", "2026-02-23")
+      .queryParam("arrivalTo", "2026-02-22")
+      .queryParam("limit", 50)
+      .build())
+      .header("X-User-Id", seed.managerUserId.toString())
+      .header("X-Role", "MANAGER")
+      .header("X-Hotel-Id", seed.hotelId.toString())
+      .exchange()
+      .expectStatus().isBadRequest()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("invalid_date_range");
+  }
+
   private UUID insertReservation(Seed s) {
     return insertReservation(s, s.receptionistUserId);
+  }
+
+  private UUID insertReservationWithGuest(
+    Seed s,
+    UUID hotelId,
+    UUID agencyId,
+    UUID createdByUserId,
+    String status,
+    LocalDate arrivalDate,
+    String guestName,
+    String guestEmail,
+    String guestPhone
+  ) {
+    UUID reservationIdWithGuest = insertReservation(s, hotelId, agencyId, createdByUserId, status, arrivalDate);
+    jdbc.update(
+      "update reservation set guest_name = ?, guest_email = ?, guest_phone = ? where id = ?",
+      guestName,
+      guestEmail,
+      guestPhone,
+      reservationIdWithGuest
+    );
+    return reservationIdWithGuest;
   }
 
   private Map<String, Object> createPayload(UUID hotelId, UUID agencyId, String externalRef) {

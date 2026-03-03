@@ -6,6 +6,7 @@ import com.rubenrzprz.reshub.security.RequestActorResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -56,7 +57,7 @@ public class ReservationController {
     return reservationQueryService.getById(id, actor);
   }
 
-  @Operation(summary = "List reservations with keyset pagination")
+  @Operation(summary = "List reservations with keyset pagination and filters")
   @ApiResponse(responseCode = "200", description = "Reservations listed and authorized")
   @ApiResponse(responseCode = "400", description = "Invalid pagination/filter input")
   @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
@@ -65,6 +66,9 @@ public class ReservationController {
     @RequestParam(name = "limit", defaultValue = "50") int limit,
     @RequestParam(name = "cursor", required = false) String cursor,
     @RequestParam(name = "status", required = false) String status,
+    @RequestParam(name = "arrivalFrom", required = false) LocalDate arrivalFrom,
+    @RequestParam(name = "arrivalTo", required = false) LocalDate arrivalTo,
+    @RequestParam(name = "guestQuery", required = false) String guestQuery,
     @RequestHeader(name = "X-User-Id", required = false) String userId,
     @RequestHeader(name = "X-Role", required = false) String role,
     @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
@@ -73,8 +77,11 @@ public class ReservationController {
     if (limit < 1 || limit > 200) {
       throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_limit", "limit must be between 1 and 200");
     }
+    if (arrivalFrom != null && arrivalTo != null && arrivalFrom.isAfter(arrivalTo)) {
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_date_range", "arrivalFrom must be on or before arrivalTo");
+    }
     RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
-    return reservationQueryService.list(actor, limit, cursor, status);
+    return reservationQueryService.list(actor, limit, cursor, status, arrivalFrom, arrivalTo, guestQuery);
   }
 
   @Operation(summary = "Create reservation")
