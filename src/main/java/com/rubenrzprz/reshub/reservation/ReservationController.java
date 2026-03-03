@@ -7,7 +7,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.HttpStatus;
@@ -77,11 +81,55 @@ public class ReservationController {
     if (limit < 1 || limit > 200) {
       throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_limit", "limit must be between 1 and 200");
     }
-    if (arrivalFrom != null && arrivalTo != null && arrivalFrom.isAfter(arrivalTo)) {
-      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_date_range", "arrivalFrom must be on or before arrivalTo");
-    }
+    validateDateRange(arrivalFrom, arrivalTo);
     RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
     return reservationQueryService.list(actor, limit, cursor, status, arrivalFrom, arrivalTo, guestQuery);
+  }
+
+  @Operation(summary = "Export reservations in JSON with role-scoped filters")
+  @ApiResponse(responseCode = "200", description = "Reservations exported as JSON")
+  @ApiResponse(responseCode = "400", description = "Invalid filter input")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @GetMapping("/reservations/export")
+  public ReservationExportResponse exportJson(
+    @RequestParam(name = "status", required = false) String status,
+    @RequestParam(name = "arrivalFrom", required = false) LocalDate arrivalFrom,
+    @RequestParam(name = "arrivalTo", required = false) LocalDate arrivalTo,
+    @RequestParam(name = "guestQuery", required = false) String guestQuery,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    validateDateRange(arrivalFrom, arrivalTo);
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    List<ReservationView> items = reservationQueryService.export(actor, status, arrivalFrom, arrivalTo, guestQuery);
+    return new ReservationExportResponse(items);
+  }
+
+  @Operation(summary = "Export reservations in CSV with role-scoped filters")
+  @ApiResponse(responseCode = "200", description = "Reservations exported as CSV")
+  @ApiResponse(responseCode = "400", description = "Invalid filter input")
+  @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @GetMapping(value = "/reservations/export.csv", produces = "text/csv")
+  public ResponseEntity<String> exportCsv(
+    @RequestParam(name = "status", required = false) String status,
+    @RequestParam(name = "arrivalFrom", required = false) LocalDate arrivalFrom,
+    @RequestParam(name = "arrivalTo", required = false) LocalDate arrivalTo,
+    @RequestParam(name = "guestQuery", required = false) String guestQuery,
+    @RequestHeader(name = "X-User-Id", required = false) String userId,
+    @RequestHeader(name = "X-Role", required = false) String role,
+    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
+    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+  ) {
+    validateDateRange(arrivalFrom, arrivalTo);
+    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    List<ReservationView> items = reservationQueryService.export(actor, status, arrivalFrom, arrivalTo, guestQuery);
+    String csv = toCsv(items);
+    return ResponseEntity.ok()
+      .contentType(MediaType.parseMediaType("text/csv"))
+      .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"reservations-export.csv\"")
+      .body(csv);
   }
 
   @Operation(summary = "Create reservation")
@@ -194,5 +242,62 @@ public class ReservationController {
   ) {
     RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
     return reservationCommandService.noShow(id, actor);
+  }
+
+  private void validateDateRange(LocalDate arrivalFrom, LocalDate arrivalTo) {
+    if (arrivalFrom != null && arrivalTo != null && arrivalFrom.isAfter(arrivalTo)) {
+      throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_date_range", "arrivalFrom must be on or before arrivalTo");
+    }
+  }
+
+  private String toCsv(List<ReservationView> items) {
+    StringBuilder csv = new StringBuilder();
+    csv.append("id,hotelId,agencyId,createdByUserId,status,arrivalDate,departureDate,guestName,notes\n");
+    for (ReservationView item : items) {
+      csv
+        .append(csvCell(item.id()))
+        .append(",")
+        .append(csvCell(item.hotelId()))
+        .append(",")
+        .append(csvCell(item.agencyId()))
+        .append(",")
+        .append(csvCell(item.createdByUserId()))
+        .append(",")
+        .append(csvCell(item.status()))
+        .append(",")
+        .append(csvCell(item.arrivalDate()))
+        .append(",")
+        .append(csvCell(item.departureDate()))
+        .append(",")
+        .append(csvCell(item.guestName()))
+        .append(",")
+        .append(csvCell(item.notes()))
+        .append("\n");
+    }
+    return csv.toString();
+  }
+
+  private String csvCell(Object value) {
+    if (value == null) {
+      return "\"\"";
+    }
+    String sanitized = sanitizeCsvFormula(value.toString());
+    String escaped = sanitized.replace("\"", "\"\"");
+    return "\"" + escaped + "\"";
+  }
+
+  private String sanitizeCsvFormula(String value) {
+    if (value.isEmpty()) {
+      return value;
+    }
+    String trimmedLeading = value.stripLeading();
+    if (trimmedLeading.isEmpty()) {
+      return value;
+    }
+    char firstChar = trimmedLeading.charAt(0);
+    if (firstChar == '=' || firstChar == '+' || firstChar == '-' || firstChar == '@') {
+      return "'" + value;
+    }
+    return value;
   }
 }
