@@ -84,45 +84,7 @@ public class ReservationQueryService {
         "from reservation where "
     );
 
-    switch (actor.role()) {
-      case ADMIN -> sql.append("1 = 1 ");
-      case MANAGER, RECEPTIONIST -> {
-        sql.append("hotel_id = ? ");
-        args.add(actor.hotelId());
-      }
-      case AGENCY -> {
-        sql.append("agency_id = ? ");
-        args.add(actor.agencyId());
-      }
-      default -> throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
-    }
-
-    if (status != null && !status.isBlank()) {
-      sql.append("and status = ? ");
-      args.add(status);
-    }
-
-    if (arrivalFrom != null) {
-      sql.append("and arrival_date >= ? ");
-      args.add(Date.valueOf(arrivalFrom));
-    }
-
-    if (arrivalTo != null) {
-      sql.append("and arrival_date <= ? ");
-      args.add(Date.valueOf(arrivalTo));
-    }
-
-    if (guestQuery != null && !guestQuery.isBlank()) {
-      String guestPattern = "%" + guestQuery.trim().toLowerCase() + "%";
-      sql.append("and (");
-      sql.append("lower(guest_name) like ? ");
-      sql.append("or lower(coalesce(guest_email, '')) like ? ");
-      sql.append("or lower(coalesce(guest_phone, '')) like ? ");
-      sql.append(") ");
-      args.add(guestPattern);
-      args.add(guestPattern);
-      args.add(guestPattern);
-    }
+    appendScopeAndFilters(sql, args, actor, status, arrivalFrom, arrivalTo, guestQuery);
 
     if (cursorKey != null) {
       sql.append("and (arrival_date > ? or (arrival_date = ? and id > ?)) ");
@@ -169,6 +131,89 @@ public class ReservationQueryService {
     );
 
     return new ReservationListResponse(rows, nextCursor, limit);
+  }
+
+  public List<ReservationView> export(
+    RequestActor actor,
+    String status,
+    LocalDate arrivalFrom,
+    LocalDate arrivalTo,
+    String guestQuery
+  ) {
+    List<Object> args = new ArrayList<>();
+    StringBuilder sql = new StringBuilder(
+      "select id, hotel_id, agency_id, created_by_user_id, status, arrival_date, departure_date, guest_name, notes " +
+        "from reservation where "
+    );
+
+    appendScopeAndFilters(sql, args, actor, status, arrivalFrom, arrivalTo, guestQuery);
+    sql.append("order by arrival_date asc, id asc");
+
+    return jdbc.query(
+      sql.toString(),
+      (rs, rowNum) -> new ReservationView(
+        UUID.fromString(rs.getString("id")),
+        UUID.fromString(rs.getString("hotel_id")),
+        UUID.fromString(rs.getString("agency_id")),
+        UUID.fromString(rs.getString("created_by_user_id")),
+        rs.getString("status"),
+        toLocalDate(rs.getDate("arrival_date")),
+        toLocalDate(rs.getDate("departure_date")),
+        rs.getString("guest_name"),
+        rs.getString("notes")
+      ),
+      args.toArray()
+    );
+  }
+
+  private void appendScopeAndFilters(
+    StringBuilder sql,
+    List<Object> args,
+    RequestActor actor,
+    String status,
+    LocalDate arrivalFrom,
+    LocalDate arrivalTo,
+    String guestQuery
+  ) {
+    switch (actor.role()) {
+      case ADMIN -> sql.append("1 = 1 ");
+      case MANAGER, RECEPTIONIST -> {
+        sql.append("hotel_id = ? ");
+        args.add(actor.hotelId());
+      }
+      case AGENCY -> {
+        sql.append("agency_id = ? ");
+        args.add(actor.agencyId());
+      }
+      default -> throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
+    }
+
+    if (status != null && !status.isBlank()) {
+      sql.append("and status = ? ");
+      args.add(status);
+    }
+
+    if (arrivalFrom != null) {
+      sql.append("and arrival_date >= ? ");
+      args.add(Date.valueOf(arrivalFrom));
+    }
+
+    if (arrivalTo != null) {
+      sql.append("and arrival_date <= ? ");
+      args.add(Date.valueOf(arrivalTo));
+    }
+
+    if (guestQuery != null && !guestQuery.isBlank()) {
+      String guestPattern = "%" + guestQuery.trim().toLowerCase() + "%";
+      sql.append("and (");
+      sql.append("lower(guest_name) like ? ");
+      sql.append("or lower(coalesce(guest_email, '')) like ? ");
+      sql.append("or lower(coalesce(guest_phone, '')) like ? ");
+      sql.append(") ");
+      args.add(guestPattern);
+      args.add(guestPattern);
+      args.add(guestPattern);
+    }
   }
 
   private void enforceReadAccess(RequestActor actor, ReservationView reservation) {
