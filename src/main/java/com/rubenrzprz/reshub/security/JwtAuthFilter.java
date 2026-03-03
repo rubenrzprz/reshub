@@ -22,16 +22,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
   private static final String BEARER_PREFIX = "Bearer ";
 
   private final JwtService jwtService;
-  private final JwtProperties jwtProperties;
   private final HandlerExceptionResolver resolver;
 
   public JwtAuthFilter(
     JwtService jwtService,
-    JwtProperties jwtProperties,
     @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver
   ) {
     this.jwtService = jwtService;
-    this.jwtProperties = jwtProperties;
     this.resolver = resolver;
   }
 
@@ -50,15 +47,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
   ) throws ServletException, IOException {
     try {
       String authHeader = request.getHeader("Authorization");
-
-      // Temporary bridge mode for existing tests/legacy clients
-      if ((authHeader == null || authHeader.isBlank()) && jwtProperties.allowLegacyHeaders()) {
-        String legacyUser = request.getHeader("X-User-Id");
-        if (legacyUser != null && !legacyUser.isBlank()) {
-          filterChain.doFilter(request, response);
-          return;
-        }
-      }
 
       if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
         throw new ApiProblemException(
