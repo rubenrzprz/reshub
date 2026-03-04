@@ -10,4 +10,3 @@ security:
     secret: "${JWT_SECRET:}"
     issuer: "reshub"
     expiration-minutes: 60
-    allow-legacy-headers: false

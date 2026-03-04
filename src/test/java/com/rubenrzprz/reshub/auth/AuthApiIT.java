@@ -42,8 +42,6 @@ class AuthApiIT {
     r.add("spring.datasource.password", postgres::getPassword);
     r.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     r.add("spring.flyway.enabled", () -> "true");
-    // Force JWT-only path for this test class
-    r.add("security.jwt.allow-legacy-headers", () -> "false");
     r.add("security.jwt.secret", () -> "test-secret-key-with-at-least-32-characters");
     r.add("security.jwt.issuer", () -> "reshub-test");
     r.add("security.jwt.expiration-minutes", () -> "60");

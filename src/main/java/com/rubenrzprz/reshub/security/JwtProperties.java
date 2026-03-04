@@ -6,8 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record JwtProperties(
   String secret,
   String issuer,
-  long expirationMinutes,
-  boolean allowLegacyHeaders
+  long expirationMinutes
 ) {
   public JwtProperties {
     if (secret == null || secret.isBlank()) {
