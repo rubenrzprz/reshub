@@ -1,4 +1,4 @@
-package com.rubenrzprz.reshub;
+package com.rubenrzprz.reshub.flyway;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

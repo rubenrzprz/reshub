@@ -1,4 +1,4 @@
-package com.rubenrzprz.reshub;
+package com.rubenrzprz.reshub.flyway;
 
 import java.sql.Date;
 import java.sql.Timestamp;

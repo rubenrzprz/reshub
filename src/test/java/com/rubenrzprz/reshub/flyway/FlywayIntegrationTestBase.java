@@ -1,4 +1,4 @@
-package com.rubenrzprz.reshub;
+package com.rubenrzprz.reshub.flyway;
 
 import com.rubenrzprz.reshub.support.PostgresIntegrationTestBase;
 import org.junit.jupiter.api.Assertions;
