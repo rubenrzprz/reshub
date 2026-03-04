@@ -28,6 +28,7 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 ---
 
 ## ✨ Features
+- 🔑 JWT authentication (`/auth/token`) with bearer-protected reservation endpoints
 - 🔐 Role-based access control for **ADMIN**, **MANAGER**, **RECEPTIONIST**, **AGENCY**
 - 🔎 Search by date range, status, and free-text guest; pagination & sorting
 - 📤 CSV/JSON export of filtered results
@@ -85,13 +86,15 @@ One command builds and runs the complete development stack:
 cp .env.example .env
 ```
 
-2. Build & start the stack:
+2) Set a strong JWT signing secret in `.env` (`JWT_SECRET`, min 32 chars).
+
+3) Build & start the stack:
 
 ```bash
 docker compose up --build
 ```
 
-3. Verify:
+4) Verify:
 
 * Health: **[http://localhost:8080/health](http://localhost:8080/health)** → `200`
 * Swagger UI: **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
@@ -101,6 +104,7 @@ docker compose up --build
 * On startup, **Flyway automatically applies database migrations**.
 * The API runs with the `dev` profile when started via Docker Compose.
 * If port `8080` is busy, set `APP_PORT=8081` in `.env` and re-run.
+* `JWT_SECRET` is required; startup fails if missing/weak.
 * Stop with `Ctrl + C` (foreground) or `docker compose down`.
 
 ### 🧪 Tests
@@ -111,6 +115,28 @@ mvn -q test
 
 * Integration tests that hit PostgreSQL use **Testcontainers**.
 * The test suite verifies that the baseline database schema is applied.
+
+### 🔐 Authentication (JWT)
+
+1. Request a token:
+
+```bash
+curl -X POST http://localhost:8080/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<user-email>","password":"<user-password>"}'
+```
+
+2. Use the `accessToken` value as bearer token:
+
+```bash
+curl http://localhost:8080/reservations \
+  -H "Authorization: Bearer <accessToken>"
+```
+
+#### 📌 Notes
+
+* Reservation endpoints use bearer authentication.
+* Legacy actor headers (`X-User-Id`, `X-Role`, `X-Hotel-Id`, `X-Agency-Id`) are disabled.
 
 ### 📤 Export Endpoints
 
@@ -126,7 +152,7 @@ Use the same role-scoped filters as `GET /reservations`:
 * [x] Bootstrap application with `/health` and Swagger UI
 * [x] CI for PRs and `main` (build + tests)
 * [x] Database baseline (PostgreSQL + Flyway)
-* [ ] Auth (JWT) + token issuance
+* [x] Auth (JWT) + token issuance
 * [x] Roles enforcement (service/API scope checks)
 * [x] Reservations CRUD + list pagination (RBAC-scoped)
 * [x] Integration tests (Testcontainers)

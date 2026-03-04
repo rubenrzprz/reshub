@@ -5,6 +5,7 @@ import com.rubenrzprz.reshub.security.RequestActor;
 import com.rubenrzprz.reshub.security.RequestActorResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.springframework.http.HttpStatus;
   name = "Reservations",
   description = "Role-scoped reservation API. ADMIN has global cross-tenant access; other roles remain tenant scoped."
 )
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 public class ReservationController {
 
