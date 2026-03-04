@@ -5,12 +5,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
+import static org.mockito.Mockito.mock;
+
 class JwtAuthFilterTest {
 
-  private static final String TEST_JWT_SECRET = "test-secret-key-with-at-least-32-characters";
   private final JwtAuthFilter filter = new JwtAuthFilter(
-    new JwtService(new JwtProperties(TEST_JWT_SECRET, "reshub-test", 60)),
-    (request, response, handler, ex) -> null
+    mock(JwtService.class),
+    mock(HandlerExceptionResolver.class)
   );
 
   @Test
