@@ -1,7 +1,7 @@
 package com.rubenrzprz.reshub.auth;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rubenrzprz.reshub.support.JwtApiIntegrationTestBase;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,51 +10,17 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class AuthApiIT {
-  private static final String VALID_PASSWORD = "secret123";
+class AuthApiIT extends JwtApiIntegrationTestBase {
   private static final String INVALID_PASSWORD = "wrong-password";
-
-  @SuppressWarnings("resource")
-  static final PostgreSQLContainer<?> postgres =
-    new PostgreSQLContainer<>("postgres:16-alpine")
-      .withDatabaseName("reshub")
-      .withUsername("reshub")
-      .withPassword("reshub");
-
-  static {
-    postgres.start();
-  }
-
-  @DynamicPropertySource
-  static void register(DynamicPropertyRegistry r) {
-    r.add("spring.datasource.url", postgres::getJdbcUrl);
-    r.add("spring.datasource.username", postgres::getUsername);
-    r.add("spring.datasource.password", postgres::getPassword);
-    r.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-    r.add("spring.flyway.enabled", () -> "true");
-    r.add("security.jwt.secret", () -> "test-secret-key-with-at-least-32-characters");
-    r.add("security.jwt.issuer", () -> "reshub-test");
-    r.add("security.jwt.expiration-minutes", () -> "60");
-  }
-
-  @Autowired
-  WebTestClient client;
 
   @Autowired
   JdbcTemplate jdbc;
-
-  @Autowired
-  ObjectMapper objectMapper;
 
   private static final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
@@ -118,7 +84,7 @@ class AuthApiIT {
 
   @Test
   void validBearerAllowsProtectedAccess() {
-    String token = issueToken(seed.managerEmail, VALID_PASSWORD);
+    String token = issueToken(seed.managerEmail);
     client.get().uri("/reservations/{id}", reservationId)
       .header("Authorization", "Bearer " + token)
       .exchange()
@@ -130,7 +96,7 @@ class AuthApiIT {
 
   @Test
   void lowercaseBearerSchemeAllowsProtectedAccess() {
-    String token = issueToken(seed.managerEmail, VALID_PASSWORD);
+    String token = issueToken(seed.managerEmail);
     client.get().uri("/reservations/{id}", reservationId)
       .header("Authorization", "bearer " + token)
       .exchange()
@@ -150,7 +116,7 @@ class AuthApiIT {
       LocalDate.of(2026, 3, 4)
     );
 
-    String token = issueToken(seed.managerEmail, VALID_PASSWORD);
+    String token = issueToken(seed.managerEmail);
 
     client.get().uri("/reservations/{id}", otherReservation)
       .header("Authorization", "Bearer " + token)
@@ -158,27 +124,6 @@ class AuthApiIT {
       .expectStatus().isForbidden()
       .expectBody()
       .jsonPath("$.code").isEqualTo("forbidden_scope");
-  }
-
-  private String issueToken(String email, String password) {
-    String body = client.post().uri("/auth/token")
-      .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(Map.of("email", email, "password", password))
-      .exchange()
-      .expectStatus().isOk()
-      .expectBody(String.class)
-      .returnResult()
-      .getResponseBody();
-
-    return readJson(body).path("accessToken").asText();
-  }
-
-  private JsonNode readJson(String value) {
-    try {
-      return objectMapper.readTree(value);
-    } catch (Exception ex) {
-      throw new RuntimeException(ex);
-    }
   }
 
   private Seed seedBaseline() {
