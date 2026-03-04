@@ -1,82 +1,18 @@
 package com.rubenrzprz.reshub.reservation;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class ReservationApiIT {
-
-  private static final String VALID_PASSWORD = "secret123";
-  private static final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-
-  private String adminToken;
-  private String managerToken;
-  private String receptionistToken;
-  private String agencyToken;
-  private String otherManagerToken;
-  private String otherAgencyToken;
-
-  @SuppressWarnings("resource")
-  static final PostgreSQLContainer<?> postgres =
-    new PostgreSQLContainer<>("postgres:16-alpine")
-      .withDatabaseName("reshub")
-      .withUsername("reshub")
-      .withPassword("reshub");
-
-  static {
-    postgres.start();
-  }
-
-  @DynamicPropertySource
-  static void register(DynamicPropertyRegistry r) {
-    r.add("spring.datasource.url", postgres::getJdbcUrl);
-    r.add("spring.datasource.username", postgres::getUsername);
-    r.add("spring.datasource.password", postgres::getPassword);
-    r.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-    r.add("spring.flyway.enabled", () -> "true");
-  }
-
-  @Autowired
-  WebTestClient client;
-
-  @Autowired
-  JdbcTemplate jdbc;
-
-  @Autowired
-  ObjectMapper objectMapper;
-
-  private Seed seed;
-  private UUID reservationId;
-
-  @BeforeEach
-  void setup() {
-    truncateAll();
-    seed = seedBaseline();
-    reservationId = insertReservation(seed);
-    adminToken = issueToken(seed.adminEmail, VALID_PASSWORD);
-    managerToken = issueToken(seed.managerEmail, VALID_PASSWORD);
-    receptionistToken = issueToken(seed.receptionistEmail, VALID_PASSWORD);
-    agencyToken = issueToken(seed.agencyEmail, VALID_PASSWORD);
-    otherManagerToken = issueToken(seed.otherManagerEmail, VALID_PASSWORD);
-    otherAgencyToken = issueToken(seed.otherAgencyEmail, VALID_PASSWORD);
-  }
+class ReservationApiIT extends ReservationApiIntegrationTestBase {
 
   @Test
   void managerCanReadReservationInOwnHotel() {
@@ -87,7 +23,7 @@ class ReservationApiIT {
       .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
       .expectBody()
       .jsonPath("$.id").isEqualTo(reservationId.toString())
-      .jsonPath("$.hotelId").isEqualTo(seed.hotelId.toString());
+      .jsonPath("$.hotelId").isEqualTo(seed.hotelId().toString());
   }
 
   @Test
@@ -97,7 +33,7 @@ class ReservationApiIT {
       .exchange()
       .expectStatus().isOk()
       .expectBody()
-      .jsonPath("$.agencyId").isEqualTo(seed.agencyId.toString());
+      .jsonPath("$.agencyId").isEqualTo(seed.agencyId().toString());
   }
 
   @Test
@@ -110,11 +46,11 @@ class ReservationApiIT {
 
   @Test
   void adminCanReadReservationAcrossHotels() {
-    UUID otherReservationId = insertReservation(
+    UUID otherReservationId = dataFactory.insertReservation(
       seed,
-      seed.otherHotelId,
-      seed.otherAgencyId,
-      seed.otherManagerUserId,
+      seed.otherHotelId(),
+      seed.otherAgencyId(),
+      seed.otherManagerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21)
     );
@@ -125,8 +61,8 @@ class ReservationApiIT {
       .expectStatus().isOk()
       .expectBody()
       .jsonPath("$.id").isEqualTo(otherReservationId.toString())
-      .jsonPath("$.hotelId").isEqualTo(seed.otherHotelId.toString())
-      .jsonPath("$.agencyId").isEqualTo(seed.otherAgencyId.toString());
+      .jsonPath("$.hotelId").isEqualTo(seed.otherHotelId().toString())
+      .jsonPath("$.agencyId").isEqualTo(seed.otherAgencyId().toString());
   }
 
   @Test
@@ -180,11 +116,11 @@ class ReservationApiIT {
 
   @Test
   void adminCanUpdateNotesAcrossHotels() {
-    UUID otherReservationId = insertReservation(
+    UUID otherReservationId = dataFactory.insertReservation(
       seed,
-      seed.otherHotelId,
-      seed.otherAgencyId,
-      seed.otherManagerUserId,
+      seed.otherHotelId(),
+      seed.otherAgencyId(),
+      seed.otherManagerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21)
     );
@@ -213,7 +149,7 @@ class ReservationApiIT {
 
   @Test
   void receptionistCannotUpdateReservationCreatedByAnotherUser() {
-    UUID managerCreatedReservation = insertReservation(seed, seed.managerUserId);
+    UUID managerCreatedReservation = dataFactory.insertReservation(seed, seed.managerUserId());
 
     client.patch().uri("/reservations/{id}/notes", managerCreatedReservation)
       .header("Authorization", "Bearer " + receptionistToken)
@@ -265,7 +201,7 @@ class ReservationApiIT {
       .expectStatus().isCreated()
       .expectBody()
       .jsonPath("$.reservationId").isEqualTo(reservationId.toString())
-      .jsonPath("$.authorUserId").isEqualTo(seed.managerUserId.toString())
+      .jsonPath("$.authorUserId").isEqualTo(seed.managerUserId().toString())
       .jsonPath("$.body").isEqualTo("manager internal note");
 
     assertCommentCount(reservationId, 1);
@@ -273,11 +209,11 @@ class ReservationApiIT {
 
   @Test
   void adminCanCreateCommentAcrossHotels() {
-    UUID otherReservationId = insertReservation(
+    UUID otherReservationId = dataFactory.insertReservation(
       seed,
-      seed.otherHotelId,
-      seed.otherAgencyId,
-      seed.otherManagerUserId,
+      seed.otherHotelId(),
+      seed.otherAgencyId(),
+      seed.otherManagerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21)
     );
@@ -290,7 +226,7 @@ class ReservationApiIT {
       .expectStatus().isCreated()
       .expectBody()
       .jsonPath("$.reservationId").isEqualTo(otherReservationId.toString())
-      .jsonPath("$.authorUserId").isEqualTo(seed.adminUserId.toString())
+      .jsonPath("$.authorUserId").isEqualTo(seed.adminUserId().toString())
       .jsonPath("$.body").isEqualTo("admin cross-tenant comment");
 
     assertCommentCount(otherReservationId, 1);
@@ -305,7 +241,7 @@ class ReservationApiIT {
       .exchange()
       .expectStatus().isCreated()
       .expectBody()
-      .jsonPath("$.authorUserId").isEqualTo(seed.receptionistUserId.toString());
+      .jsonPath("$.authorUserId").isEqualTo(seed.receptionistUserId().toString());
 
     assertCommentCount(reservationId, 1);
   }
@@ -363,11 +299,11 @@ class ReservationApiIT {
 
   @Test
   void adminCanChangeStatusAcrossHotels() {
-    UUID otherReservationId = insertReservation(
+    UUID otherReservationId = dataFactory.insertReservation(
       seed,
-      seed.otherHotelId,
-      seed.otherAgencyId,
-      seed.otherManagerUserId,
+      seed.otherHotelId(),
+      seed.otherAgencyId(),
+      seed.otherManagerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21)
     );
@@ -399,7 +335,7 @@ class ReservationApiIT {
 
   @Test
   void receptionistCannotChangeStatusForReservationCreatedByAnotherUser() {
-    UUID managerCreatedReservation = insertReservation(seed, seed.managerUserId);
+    UUID managerCreatedReservation = dataFactory.insertReservation(seed, seed.managerUserId());
 
     client.post().uri("/reservations/{id}/cancel", managerCreatedReservation)
       .header("Authorization", "Bearer " + receptionistToken)
@@ -456,13 +392,13 @@ class ReservationApiIT {
     client.post().uri("/reservations")
       .header("Authorization", "Bearer " + managerToken)
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-manager"))
+      .bodyValue(createPayload(seed.hotelId(), seed.agencyId(), "ext-create-manager"))
       .exchange()
       .expectStatus().isCreated()
       .expectBody()
-      .jsonPath("$.hotelId").isEqualTo(seed.hotelId.toString())
-      .jsonPath("$.agencyId").isEqualTo(seed.agencyId.toString())
-      .jsonPath("$.createdByUserId").isEqualTo(seed.managerUserId.toString())
+      .jsonPath("$.hotelId").isEqualTo(seed.hotelId().toString())
+      .jsonPath("$.agencyId").isEqualTo(seed.agencyId().toString())
+      .jsonPath("$.createdByUserId").isEqualTo(seed.managerUserId().toString())
       .jsonPath("$.status").isEqualTo("NEW");
   }
 
@@ -471,13 +407,13 @@ class ReservationApiIT {
     client.post().uri("/reservations")
       .header("Authorization", "Bearer " + adminToken)
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(createPayload(seed.otherHotelId, seed.otherAgencyId, "ext-create-admin"))
+      .bodyValue(createPayload(seed.otherHotelId(), seed.otherAgencyId(), "ext-create-admin"))
       .exchange()
       .expectStatus().isCreated()
       .expectBody()
-      .jsonPath("$.hotelId").isEqualTo(seed.otherHotelId.toString())
-      .jsonPath("$.agencyId").isEqualTo(seed.otherAgencyId.toString())
-      .jsonPath("$.createdByUserId").isEqualTo(seed.adminUserId.toString())
+      .jsonPath("$.hotelId").isEqualTo(seed.otherHotelId().toString())
+      .jsonPath("$.agencyId").isEqualTo(seed.otherAgencyId().toString())
+      .jsonPath("$.createdByUserId").isEqualTo(seed.adminUserId().toString())
       .jsonPath("$.status").isEqualTo("NEW");
   }
 
@@ -486,7 +422,7 @@ class ReservationApiIT {
     client.post().uri("/reservations")
       .header("Authorization", "Bearer " + managerToken)
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(createPayload(seed.otherHotelId, seed.agencyId, "ext-create-manager-forbidden"))
+      .bodyValue(createPayload(seed.otherHotelId(), seed.agencyId(), "ext-create-manager-forbidden"))
       .exchange()
       .expectStatus().isForbidden();
   }
@@ -496,11 +432,11 @@ class ReservationApiIT {
     client.post().uri("/reservations")
       .header("Authorization", "Bearer " + receptionistToken)
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-reception"))
+      .bodyValue(createPayload(seed.hotelId(), seed.agencyId(), "ext-create-reception"))
       .exchange()
       .expectStatus().isCreated()
       .expectBody()
-      .jsonPath("$.createdByUserId").isEqualTo(seed.receptionistUserId.toString());
+      .jsonPath("$.createdByUserId").isEqualTo(seed.receptionistUserId().toString());
   }
 
   @Test
@@ -508,12 +444,12 @@ class ReservationApiIT {
     client.post().uri("/reservations")
       .header("Authorization", "Bearer " + agencyToken)
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-agency"))
+      .bodyValue(createPayload(seed.hotelId(), seed.agencyId(), "ext-create-agency"))
       .exchange()
       .expectStatus().isCreated()
       .expectBody()
-      .jsonPath("$.agencyId").isEqualTo(seed.agencyId.toString())
-      .jsonPath("$.createdByUserId").isEqualTo(seed.agencyUserId.toString());
+      .jsonPath("$.agencyId").isEqualTo(seed.agencyId().toString())
+      .jsonPath("$.createdByUserId").isEqualTo(seed.agencyUserId().toString());
   }
 
   @Test
@@ -521,14 +457,14 @@ class ReservationApiIT {
     client.post().uri("/reservations")
       .header("Authorization", "Bearer " + agencyToken)
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(createPayload(seed.hotelId, seed.otherAgencyId, "ext-create-agency-forbidden"))
+      .bodyValue(createPayload(seed.hotelId(), seed.otherAgencyId(), "ext-create-agency-forbidden"))
       .exchange()
       .expectStatus().isForbidden();
   }
 
   @Test
   void duplicateExternalReferenceReturnsConflict() {
-    Map<String, Object> payload = createPayload(seed.hotelId, seed.agencyId, "ext-create-dup");
+    Map<String, Object> payload = createPayload(seed.hotelId(), seed.agencyId(), "ext-create-dup");
 
     client.post().uri("/reservations")
       .header("Authorization", "Bearer " + managerToken)
@@ -553,8 +489,8 @@ class ReservationApiIT {
       .header("Authorization", "Bearer " + managerToken)
       .contentType(MediaType.APPLICATION_JSON)
       .bodyValue(Map.of(
-        "hotelId", seed.hotelId.toString(),
-        "agencyId", seed.agencyId.toString(),
+        "hotelId", seed.hotelId().toString(),
+        "agencyId", seed.agencyId().toString(),
         "externalRef", "ext-create-invalid",
         "arrivalDate", "2026-02-25",
         "departureDate", "2026-02-25",
@@ -591,7 +527,7 @@ class ReservationApiIT {
   void createMissingActorHeadersIsUnauthorized() {
     client.post().uri("/reservations")
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(createPayload(seed.hotelId, seed.agencyId, "ext-create-no-actor"))
+      .bodyValue(createPayload(seed.hotelId(), seed.agencyId(), "ext-create-no-actor"))
       .exchange()
       .expectStatus().isUnauthorized()
       .expectBody()
@@ -600,8 +536,8 @@ class ReservationApiIT {
 
   @Test
   void managerListIsScopedToOwnHotel() {
-    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 21));
-    insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "NEW", LocalDate.of(2026, 2, 22));
+    dataFactory.insertReservation(seed, seed.hotelId(), seed.agencyId(), seed.managerUserId(), "NEW", LocalDate.of(2026, 2, 21));
+    dataFactory.insertReservation(seed, seed.otherHotelId(), seed.otherAgencyId(), seed.otherManagerUserId(), "NEW", LocalDate.of(2026, 2, 22));
 
     client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 50).build())
       .header("Authorization", "Bearer " + managerToken)
@@ -609,13 +545,13 @@ class ReservationApiIT {
       .expectStatus().isOk()
       .expectBody()
       .jsonPath("$.items.length()").isEqualTo(2)
-      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString())
-      .jsonPath("$.items[1].hotelId").isEqualTo(seed.hotelId.toString());
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId().toString())
+      .jsonPath("$.items[1].hotelId").isEqualTo(seed.hotelId().toString());
   }
 
   @Test
   void adminListCanIncludeMultipleHotels() {
-    insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "NEW", LocalDate.of(2026, 2, 21));
+    dataFactory.insertReservation(seed, seed.otherHotelId(), seed.otherAgencyId(), seed.otherManagerUserId(), "NEW", LocalDate.of(2026, 2, 21));
 
     client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 50).build())
       .header("Authorization", "Bearer " + adminToken)
@@ -623,13 +559,13 @@ class ReservationApiIT {
       .expectStatus().isOk()
       .expectBody()
       .jsonPath("$.items.length()").isEqualTo(2)
-      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString())
-      .jsonPath("$.items[1].hotelId").isEqualTo(seed.otherHotelId.toString());
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId().toString())
+      .jsonPath("$.items[1].hotelId").isEqualTo(seed.otherHotelId().toString());
   }
 
   @Test
   void agencyListIsScopedToOwnAgency() {
-    insertReservation(seed, seed.hotelId, seed.otherAgencyId, seed.otherAgencyUserId, "NEW", LocalDate.of(2026, 2, 21));
+    dataFactory.insertReservation(seed, seed.hotelId(), seed.otherAgencyId(), seed.otherAgencyUserId(), "NEW", LocalDate.of(2026, 2, 21));
 
     client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 50).build())
       .header("Authorization", "Bearer " + agencyToken)
@@ -637,13 +573,13 @@ class ReservationApiIT {
       .expectStatus().isOk()
       .expectBody()
       .jsonPath("$.items.length()").isEqualTo(1)
-      .jsonPath("$.items[0].agencyId").isEqualTo(seed.agencyId.toString());
+      .jsonPath("$.items[0].agencyId").isEqualTo(seed.agencyId().toString());
   }
 
   @Test
   void keysetPaginationReturnsNextCursorAndSecondPage() throws Exception {
-    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 21));
-    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 22));
+    dataFactory.insertReservation(seed, seed.hotelId(), seed.agencyId(), seed.managerUserId(), "NEW", LocalDate.of(2026, 2, 21));
+    dataFactory.insertReservation(seed, seed.hotelId(), seed.agencyId(), seed.managerUserId(), "NEW", LocalDate.of(2026, 2, 22));
 
     String page1Body = client.get().uri(uriBuilder -> uriBuilder.path("/reservations").queryParam("limit", 2).build())
       .header("Authorization", "Bearer " + managerToken)
@@ -692,8 +628,8 @@ class ReservationApiIT {
 
   @Test
   void statusFilterAppliesWithinScope() {
-    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "CONFIRMED", LocalDate.of(2026, 2, 23));
-    insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "CONFIRMED", LocalDate.of(2026, 2, 24));
+    dataFactory.insertReservation(seed, seed.hotelId(), seed.agencyId(), seed.managerUserId(), "CONFIRMED", LocalDate.of(2026, 2, 23));
+    dataFactory.insertReservation(seed, seed.otherHotelId(), seed.otherAgencyId(), seed.otherManagerUserId(), "CONFIRMED", LocalDate.of(2026, 2, 24));
 
     client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
         .queryParam("limit", 50)
@@ -705,14 +641,14 @@ class ReservationApiIT {
       .expectBody()
       .jsonPath("$.items.length()").isEqualTo(1)
       .jsonPath("$.items[0].status").isEqualTo("CONFIRMED")
-      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString());
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId().toString());
   }
 
   @Test
   void arrivalDateRangeFilterAppliesWithinManagerScope() {
-    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 18));
-    insertReservation(seed, seed.hotelId, seed.agencyId, seed.managerUserId, "NEW", LocalDate.of(2026, 2, 23));
-    insertReservation(seed, seed.otherHotelId, seed.otherAgencyId, seed.otherManagerUserId, "NEW", LocalDate.of(2026, 2, 22));
+    dataFactory.insertReservation(seed, seed.hotelId(), seed.agencyId(), seed.managerUserId(), "NEW", LocalDate.of(2026, 2, 18));
+    dataFactory.insertReservation(seed, seed.hotelId(), seed.agencyId(), seed.managerUserId(), "NEW", LocalDate.of(2026, 2, 23));
+    dataFactory.insertReservation(seed, seed.otherHotelId(), seed.otherAgencyId(), seed.otherManagerUserId(), "NEW", LocalDate.of(2026, 2, 22));
 
     client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
         .queryParam("arrivalFrom", "2026-02-20")
@@ -725,38 +661,38 @@ class ReservationApiIT {
       .expectBody()
       .jsonPath("$.items.length()").isEqualTo(1)
       .jsonPath("$.items[0].arrivalDate").isEqualTo("2026-02-20")
-      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString());
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId().toString());
   }
 
   @Test
   void guestQueryFiltersByNameWithinManagerScope() {
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.managerUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.managerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21),
       "Alice Smith",
       "alice@example.com",
       "+34111111111"
     );
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.managerUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.managerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 22),
       "Bob Johnson",
       "bob@example.com",
       "+34222222222"
     );
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.otherHotelId,
-      seed.otherAgencyId,
-      seed.otherManagerUserId,
+      seed.otherHotelId(),
+      seed.otherAgencyId(),
+      seed.otherManagerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 22),
       "Alice Outside",
@@ -774,27 +710,27 @@ class ReservationApiIT {
       .expectBody()
       .jsonPath("$.items.length()").isEqualTo(1)
       .jsonPath("$.items[0].guestName").isEqualTo("Alice Smith")
-      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId.toString());
+      .jsonPath("$.items[0].hotelId").isEqualTo(seed.hotelId().toString());
   }
 
   @Test
   void guestQueryCanMatchEmailWithinAgencyScope() {
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.agencyUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.agencyUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21),
       "Agency Match",
       "match@agency.com",
       "+34111111111"
     );
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.otherAgencyId,
-      seed.otherAgencyUserId,
+      seed.hotelId(),
+      seed.otherAgencyId(),
+      seed.otherAgencyUserId(),
       "NEW",
       LocalDate.of(2026, 2, 22),
       "Other Agency Match",
@@ -811,39 +747,39 @@ class ReservationApiIT {
       .expectStatus().isOk()
       .expectBody()
       .jsonPath("$.items.length()").isEqualTo(1)
-      .jsonPath("$.items[0].agencyId").isEqualTo(seed.agencyId.toString())
+      .jsonPath("$.items[0].agencyId").isEqualTo(seed.agencyId().toString())
       .jsonPath("$.items[0].guestName").isEqualTo("Agency Match");
   }
 
   @Test
   void combinedStatusDateAndGuestFiltersReturnIntersection() {
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.managerUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.managerUserId(),
       "CONFIRMED",
       LocalDate.of(2026, 2, 21),
       "Alice Combined",
       "alice-combined@example.com",
       "+34111111111"
     );
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.managerUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.managerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21),
       "Alice Wrong Status",
       "alice-wrong@example.com",
       "+34222222222"
     );
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.managerUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.managerUserId(),
       "CONFIRMED",
       LocalDate.of(2026, 2, 25),
       "Alice Wrong Date",
@@ -884,22 +820,22 @@ class ReservationApiIT {
 
   @Test
   void managerCanExportJsonWithFilters() {
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.managerUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.managerUserId(),
       "CONFIRMED",
       LocalDate.of(2026, 2, 21),
       "Export Match",
       "export-match@example.com",
       "+34111111111"
     );
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.managerUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.managerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21),
       "Export Wrong Status",
@@ -925,22 +861,22 @@ class ReservationApiIT {
 
   @Test
   void agencyExportJsonRemainsScopedToOwnAgency() {
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.agencyUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.agencyUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21),
       "Agency Export Match",
       "agency-export@example.com",
       "+34111111111"
     );
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.otherAgencyId,
-      seed.otherAgencyUserId,
+      seed.hotelId(),
+      seed.otherAgencyId(),
+      seed.otherAgencyUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21),
       "Other Agency Export Match",
@@ -956,17 +892,17 @@ class ReservationApiIT {
       .expectStatus().isOk()
       .expectBody()
       .jsonPath("$.items.length()").isEqualTo(1)
-      .jsonPath("$.items[0].agencyId").isEqualTo(seed.agencyId.toString())
+      .jsonPath("$.items[0].agencyId").isEqualTo(seed.agencyId().toString())
       .jsonPath("$.items[0].guestName").isEqualTo("Agency Export Match");
   }
 
   @Test
   void adminCanExportCsvAcrossHotelsWithHeaders() {
-    insertReservationWithGuest(
+    dataFactory.insertReservationWithGuest(
       seed,
-      seed.otherHotelId,
-      seed.otherAgencyId,
-      seed.otherManagerUserId,
+      seed.otherHotelId(),
+      seed.otherAgencyId(),
+      seed.otherManagerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21),
       "CSV Admin Match",
@@ -986,7 +922,7 @@ class ReservationApiIT {
       .value(body -> {
         Assertions.assertTrue(body.startsWith("id,hotelId,agencyId,createdByUserId,status,arrivalDate,departureDate,guestName,notes"));
         Assertions.assertTrue(body.contains("\"CSV Admin Match\""));
-        Assertions.assertTrue(body.contains(seed.otherHotelId.toString()));
+        Assertions.assertTrue(body.contains(seed.otherHotelId().toString()));
       });
   }
 
@@ -1005,11 +941,11 @@ class ReservationApiIT {
 
   @Test
   void csvExportNeutralizesFormulaLikeCells() {
-    UUID formulaReservationId = insertReservationWithGuest(
+    UUID formulaReservationId = dataFactory.insertReservationWithGuest(
       seed,
-      seed.hotelId,
-      seed.agencyId,
-      seed.managerUserId,
+      seed.hotelId(),
+      seed.agencyId(),
+      seed.managerUserId(),
       "NEW",
       LocalDate.of(2026, 2, 21),
       "=2+2",
@@ -1028,254 +964,6 @@ class ReservationApiIT {
         Assertions.assertTrue(body.contains("\"'@cmd\""));
       });
   }
-
-  private UUID insertReservation(Seed s) {
-    return insertReservation(s, s.receptionistUserId);
-  }
-
-  private UUID insertReservationWithGuest(
-    Seed s,
-    UUID hotelId,
-    UUID agencyId,
-    UUID createdByUserId,
-    String status,
-    LocalDate arrivalDate,
-    String guestName,
-    String guestEmail,
-    String guestPhone
-  ) {
-    UUID reservationIdWithGuest = insertReservation(s, hotelId, agencyId, createdByUserId, status, arrivalDate);
-    jdbc.update(
-      "update reservation set guest_name = ?, guest_email = ?, guest_phone = ? where id = ?",
-      guestName,
-      guestEmail,
-      guestPhone,
-      reservationIdWithGuest
-    );
-    return reservationIdWithGuest;
-  }
-
-  private Map<String, Object> createPayload(UUID hotelId, UUID agencyId, String externalRef) {
-    return Map.of(
-      "hotelId", hotelId.toString(),
-      "agencyId", agencyId.toString(),
-      "externalRef", externalRef,
-      "arrivalDate", "2026-02-25",
-      "departureDate", "2026-02-27",
-      "guestName", "Create Payload Guest",
-      "adults", 2,
-      "children", 0,
-      "notes", "Created via API test"
-    );
-  }
-
-  private UUID insertReservation(Seed s, UUID createdByUserId) {
-    return insertReservation(s, s.hotelId, s.agencyId, createdByUserId, "NEW", LocalDate.of(2026, 2, 20));
-  }
-
-  private UUID insertReservation(
-    Seed s,
-    UUID hotelId,
-    UUID agencyId,
-    UUID createdByUserId,
-    String status,
-    LocalDate arrivalDate
-  ) {
-    UUID id = UUID.randomUUID();
-    jdbc.update(
-      "insert into reservation " +
-        "(id, hotel_id, agency_id, created_by_user_id, external_ref, status, arrival_date, departure_date, guest_name, adults, children) " +
-        "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      id,
-      hotelId,
-      agencyId,
-      createdByUserId,
-      "ext-" + id.toString().substring(0, 8),
-      status,
-      java.sql.Date.valueOf(arrivalDate),
-      java.sql.Date.valueOf(arrivalDate.plusDays(2)),
-      "Test Guest",
-      2,
-      0
-    );
-    return id;
-  }
-
-  private Seed seedBaseline() {
-    UUID hotelId = UUID.randomUUID();
-    jdbc.update("insert into hotel (id, code, name) values (?, ?, ?)",
-      hotelId,
-      "h" + hotelId.toString().replace("-", "").substring(0, 8),
-      "Test Hotel");
-
-    UUID agencyId = UUID.randomUUID();
-    jdbc.update("insert into agency (id, code, name) values (?, ?, ?)",
-      agencyId,
-      "a" + agencyId.toString().replace("-", "").substring(0, 8),
-      "Test Agency");
-
-    UUID managerUserId = UUID.randomUUID();
-    String managerEmail = "manager-" + managerUserId.toString().substring(0, 8) + "@example.com";
-    jdbc.update(
-      "insert into app_user (id, email, password_hash, role, hotel_id) values (?, ?, ?, ?, ?)",
-      managerUserId,
-      managerEmail,
-      encoder.encode(VALID_PASSWORD),
-      "MANAGER",
-      hotelId
-    );
-
-    UUID adminUserId = UUID.randomUUID();
-    String adminEmail = "admin-" + adminUserId.toString().substring(0, 8) + "@example.com";
-    jdbc.update(
-      "insert into app_user (id, email, password_hash, role, hotel_id) values (?, ?, ?, ?, ?)",
-      adminUserId,
-      adminEmail,
-      encoder.encode(VALID_PASSWORD),
-      "ADMIN",
-      hotelId
-    );
-
-    UUID receptionistUserId = UUID.randomUUID();
-    String receptionistEmail = "reception-" + receptionistUserId.toString().substring(0, 8) + "@example.com";
-    jdbc.update(
-      "insert into app_user (id, email, password_hash, role, hotel_id) values (?, ?, ?, ?, ?)",
-      receptionistUserId,
-      receptionistEmail,
-      encoder.encode(VALID_PASSWORD),
-      "RECEPTIONIST",
-      hotelId
-    );
-
-    UUID agencyUserId = UUID.randomUUID();
-    String agencyEmail = "agency-" + agencyUserId.toString().substring(0, 8) + "@example.com";
-    jdbc.update(
-      "insert into app_user (id, email, password_hash, role, agency_id) values (?, ?, ?, ?, ?)",
-      agencyUserId,
-      agencyEmail,
-      encoder.encode(VALID_PASSWORD),
-      "AGENCY",
-      agencyId
-    );
-
-    UUID otherHotelId = UUID.randomUUID();
-    jdbc.update("insert into hotel (id, code, name) values (?, ?, ?)",
-      otherHotelId,
-      "h" + otherHotelId.toString().replace("-", "").substring(0, 8),
-      "Other Hotel");
-
-    UUID otherAgencyId = UUID.randomUUID();
-    jdbc.update("insert into agency (id, code, name) values (?, ?, ?)",
-      otherAgencyId,
-      "a" + otherAgencyId.toString().replace("-", "").substring(0, 8),
-      "Other Agency");
-
-    UUID otherManagerUserId = UUID.randomUUID();
-    String otherManagerEmail = "other-manager-" + otherManagerUserId.toString().substring(0, 8) + "@example.com";
-    jdbc.update(
-      "insert into app_user (id, email, password_hash, role, hotel_id) values (?, ?, ?, ?, ?)",
-      otherManagerUserId,
-      otherManagerEmail,
-      encoder.encode(VALID_PASSWORD),
-      "MANAGER",
-      otherHotelId
-    );
-
-    UUID otherAgencyUserId = UUID.randomUUID();
-    String otherAgencyEmail = "other-agency-" + otherAgencyUserId.toString().substring(0, 8) + "@example.com";
-    jdbc.update(
-      "insert into app_user (id, email, password_hash, role, agency_id) values (?, ?, ?, ?, ?)",
-      otherAgencyUserId,
-      otherAgencyEmail,
-      encoder.encode(VALID_PASSWORD),
-      "AGENCY",
-      otherAgencyId
-    );
-
-    return new Seed(
-      hotelId,
-      agencyId,
-      adminUserId,
-      adminEmail,
-      managerUserId,
-      managerEmail,
-      receptionistUserId,
-      receptionistEmail,
-      agencyUserId,
-      agencyEmail,
-      otherHotelId,
-      otherAgencyId,
-      otherManagerUserId,
-      otherManagerEmail,
-      otherAgencyUserId,
-      otherAgencyEmail
-    );
-  }
-
-  private void truncateAll() {
-    jdbc.execute("truncate table reservation_comment, reservation, room_type_channel_map, room_type, app_user, agency, hotel restart identity cascade");
-  }
-
-  private void assertCommentCount(UUID reservationId, int expected) {
-    Integer count = jdbc.queryForObject(
-      "select count(*) from reservation_comment where reservation_id = ?",
-      Integer.class,
-      reservationId
-    );
-    Assertions.assertEquals(expected, count);
-  }
-
-  private String loadStatus(UUID reservationId) {
-    return jdbc.queryForObject(
-      "select status from reservation where id = ?",
-      String.class,
-      reservationId
-    );
-  }
-
-  private Object loadCancelledAt(UUID reservationId) {
-    return jdbc.queryForObject(
-      "select cancelled_at from reservation where id = ?",
-      Object.class,
-      reservationId
-    );
-  }
-
-  private String issueToken(String email, String password) {
-    String body = client.post().uri("/auth/token")
-      .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(Map.of("email", email, "password", password))
-      .exchange()
-      .expectStatus().isOk()
-      .expectBody(String.class)
-      .returnResult()
-      .getResponseBody();
-
-    try {
-      return objectMapper.readTree(body).path("accessToken").asText();
-    } catch (Exception ex) {
-      throw new RuntimeException(ex);
-    }
-  }
-
-  private record Seed(
-    UUID hotelId,
-    UUID agencyId,
-    UUID adminUserId,
-    String adminEmail,
-    UUID managerUserId,
-    String managerEmail,
-    UUID receptionistUserId,
-    String receptionistEmail,
-    UUID agencyUserId,
-    String agencyEmail,
-    UUID otherHotelId,
-    UUID otherAgencyId,
-    UUID otherManagerUserId,
-    String otherManagerEmail,
-    UUID otherAgencyUserId,
-    String otherAgencyEmail
-  ) {
-  }
 }
+
 
