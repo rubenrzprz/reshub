@@ -3,7 +3,7 @@ package com.rubenrzprz.reshub;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class FlywayRoomTypeChannelMapIntegrityIT extends FlywayITBase {
+class FlywayRoomTypeChannelMapIntegrityIT extends FlywayIntegrationTestBase {
 
   @Test
   void v3ConstraintsExist() {

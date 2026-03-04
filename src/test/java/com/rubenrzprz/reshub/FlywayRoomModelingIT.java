@@ -2,7 +2,7 @@ package com.rubenrzprz.reshub;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-class FlywayRoomModelingIT extends FlywayITBase {
+class FlywayRoomModelingIT extends FlywayIntegrationTestBase {
 
   @Test
   void v2TablesExist() {

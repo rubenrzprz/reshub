@@ -1,35 +1,13 @@
 package com.rubenrzprz.reshub;
 
+import com.rubenrzprz.reshub.support.PostgresIntegrationTestBase;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 @SpringBootTest
-abstract class FlywayITBase {
-
-  @SuppressWarnings("resource")
-  static final PostgreSQLContainer<?> postgres =
-    new PostgreSQLContainer<>("postgres:16-alpine")
-      .withDatabaseName("reshub")
-      .withUsername("reshub")
-      .withPassword("reshub");
-
-  static {
-    postgres.start();
-  }
-
-  @DynamicPropertySource
-  static void register(DynamicPropertyRegistry r) {
-    r.add("spring.datasource.url", postgres::getJdbcUrl);
-    r.add("spring.datasource.username", postgres::getUsername);
-    r.add("spring.datasource.password", postgres::getPassword);
-    r.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-    r.add("spring.flyway.enabled", () -> "true");
-  }
+abstract class FlywayIntegrationTestBase extends PostgresIntegrationTestBase {
 
   @Autowired
   JdbcTemplate jdbc;
