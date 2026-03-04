@@ -62,6 +62,9 @@ public class AuthService {
     if (rows.isEmpty()) {
       throw invalidCredentials();
     }
+    if (rows.size() > 1) {
+      throw invalidCredentials();
+    }
 
     return rows.getFirst();
   }
