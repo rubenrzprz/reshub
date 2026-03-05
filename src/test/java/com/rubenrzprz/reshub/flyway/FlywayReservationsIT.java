@@ -148,6 +148,19 @@ class FlywayReservationsIT extends FlywayIntegrationTestBase {
     Assertions.assertEquals(1, count);
   }
 
+  @Test
+  void v5AgencyAuthorizationTablesConstraintsAndIndexesExist() {
+    Assertions.assertEquals(1, tableExists("agency_hotel_auth"));
+    Assertions.assertEquals(1, tableExists("agency_hotel_room_type_allow"));
+
+    Assertions.assertEquals(1, constraintExists("agency_hotel_auth_status_check"));
+    Assertions.assertEquals(1, constraintExists("agency_hotel_auth_validity_check"));
+    Assertions.assertEquals(1, constraintExists("agency_hotel_auth_agency_hotel_unique"));
+
+    Assertions.assertEquals(1, indexExists("agency_hotel_auth", "idx_agency_hotel_auth_agency"));
+    Assertions.assertEquals(1, indexExists("agency_hotel_auth", "idx_agency_hotel_auth_hotel"));
+  }
+
   private void insertReservation(
     Seed seed,
     UUID reservationId,
