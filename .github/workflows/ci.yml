@@ -51,8 +51,5 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build
-        run: mvn -B -ntp -DskipTests package
-
-      - name: Test
-        run: mvn -B -ntp test
+      - name: Verify
+        run: mvn -B -ntp verify
