@@ -1,4 +1,4 @@
-package com.rubenrzprz.reshub;
+package com.rubenrzprz.reshub.flyway;
 
 import java.sql.Date;
 import java.sql.Timestamp;
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 
-class FlywayReservationsIT extends FlywayITBase {
+class FlywayReservationsIT extends FlywayIntegrationTestBase {
 
   @Test
   void v4TablesConstraintsAndIndexesExist() {
