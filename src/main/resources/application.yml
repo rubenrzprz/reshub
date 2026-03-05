@@ -10,3 +10,5 @@ security:
     secret: "${JWT_SECRET:}"
     issuer: "reshub"
     expiration-minutes: 60
+features:
+  enforce-agency-hotel-auth: false

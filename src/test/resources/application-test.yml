@@ -11,3 +11,5 @@ security:
     secret: "test-secret-key-with-at-least-32-characters"
     issuer: "reshub-test"
     expiration-minutes: 60
+features:
+  enforce-agency-hotel-auth: false

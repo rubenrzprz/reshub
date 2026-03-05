@@ -49,7 +49,7 @@ public class ReservationController {
   @Operation(summary = "Get reservation by id")
   @ApiResponse(responseCode = "200", description = "Reservation found and authorized")
   @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
-  @ApiResponse(responseCode = "403", description = "Forbidden by role scope")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope or agency-hotel authorization policy")
   @ApiResponse(responseCode = "404", description = "Reservation not found")
   @GetMapping("/reservations/{id}")
   public ReservationView getById(
@@ -67,6 +67,7 @@ public class ReservationController {
   @ApiResponse(responseCode = "200", description = "Reservations listed and authorized")
   @ApiResponse(responseCode = "400", description = "Invalid pagination/filter input")
   @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope or agency-hotel authorization policy")
   @GetMapping("/reservations")
   public ReservationListResponse list(
     @RequestParam(name = "limit", defaultValue = "50") int limit,
@@ -138,7 +139,7 @@ public class ReservationController {
   @ApiResponse(responseCode = "201", description = "Reservation created and authorized")
   @ApiResponse(responseCode = "400", description = "Invalid reservation payload")
   @ApiResponse(responseCode = "401", description = "Missing/invalid actor context")
-  @ApiResponse(responseCode = "403", description = "Forbidden by role scope")
+  @ApiResponse(responseCode = "403", description = "Forbidden by role scope or agency-hotel authorization policy")
   @ApiResponse(responseCode = "409", description = "Duplicate external reference")
   @PostMapping("/reservations")
   @ResponseStatus(HttpStatus.CREATED)
