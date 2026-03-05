@@ -31,6 +31,7 @@ final class ReservationRbacLog {
   static final String REASON_AGENCY_SCOPE_MISMATCH = "agency_scope_mismatch";
   static final String REASON_OWNER_MISMATCH = "owner_mismatch";
   static final String REASON_COMMENTS_INTERNAL_ONLY = "comments_internal_only";
+  static final String REASON_AGENCY_HOTEL_AUTH_MISSING_OR_INVALID = "agency_hotel_auth_missing_or_invalid";
   static final String REASON_INVALID_TRANSITION = "invalid_transition";
   static final String REASON_UNSUPPORTED_ROLE = "unsupported_role";
 

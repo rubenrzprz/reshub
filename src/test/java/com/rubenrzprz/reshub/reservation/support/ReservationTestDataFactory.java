@@ -16,7 +16,16 @@ public class ReservationTestDataFactory {
   }
 
   public void truncateAll() {
-    jdbc.execute("truncate table reservation_comment, reservation, room_type_channel_map, room_type, app_user, agency, hotel restart identity cascade");
+    jdbc.execute("truncate table " +
+      "agency_hotel_room_type_allow, " +
+      "agency_hotel_auth, " +
+      "reservation_comment, " +
+      "reservation, " +
+      "room_type_channel_map, " +
+      "room_type, app_user, " +
+      "agency, " +
+      "hotel " +
+      "restart identity cascade");
   }
 
   public Seed seedBaseline(String validPassword) {
@@ -184,6 +193,27 @@ public class ReservationTestDataFactory {
       "Test Guest",
       2,
       0
+    );
+    return id;
+  }
+
+  public UUID insertAgencyHotelAuth(
+    UUID agencyId,
+    UUID hotelId,
+    String status,
+    LocalDate validFrom,
+    LocalDate validTo
+  ) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+      "insert into agency_hotel_auth (id, agency_id, hotel_id, status, valid_from, valid_to) " +
+        "values (?, ?, ?, ?, ?, ?)",
+      id,
+      agencyId,
+      hotelId,
+      status,
+      validFrom == null ? null : java.sql.Date.valueOf(validFrom),
+      validTo == null ? null : java.sql.Date.valueOf(validTo)
     );
     return id;
   }

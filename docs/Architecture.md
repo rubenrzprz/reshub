@@ -1,6 +1,6 @@
 # 🏗️ ResHub — Architecture (Domain & Data Model)
 
-**Version:** 0.3 (MVP)  
+**Version:** 0.4 (MVP)  
 **Status:** Draft — authoritative design for MVP; kept in sync with migrations
 
 ---
@@ -262,7 +262,7 @@
 
 **Semantics**
 
-* If feature flag `enforceAgencyHotelAuth=true`: at create (AGENCY), require ACTIVE row whose validity window covers the arrival date. At read/list, scope to authorized hotels.
+* If feature flag `enforceAgencyHotelAuth=true`: at create/read/list (AGENCY), require ACTIVE row whose validity window covers the reservation arrival date.
 
 ---
 
@@ -395,6 +395,7 @@
 
 ## 13) 📝 Change Log
 
+* v0.4 — Implemented V5 agency authorization schema and feature-flagged AGENCY create/read/list enforcement with `agency_not_authorized_for_hotel`.
 * v0.3 — Added reservations/comments lifecycle constraints (V4), RBAC service/API enforcement, and standardized `ProblemDetail` error codes.
 * v0.2 — Added room_type_channel_map hotel integrity constraints (V3).
 * v0.1 — Initial MVP model (this document).

@@ -33,6 +33,7 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 - 🔎 Search by date range, status, and free-text guest; pagination & sorting
 - 📤 CSV/JSON export of filtered results
 - 🧭 Idempotent `externalRef` per (hotel, agency)
+- 🧾 Feature-flagged agency-hotel authorization (`features.enforce-agency-hotel-auth`)
 - 🧱 Standardized `ProblemDetail` error codes (401/403/404/409/400 paths)
 - ✅ Integration tests with **Testcontainers (Postgres)**
 
@@ -110,11 +111,23 @@ docker compose up --build
 ### 🧪 Tests
 
 ```bash
-mvn -q test
+mvn -q verify
 ```
 
 * Integration tests that hit PostgreSQL use **Testcontainers**.
 * The test suite verifies that the baseline database schema is applied.
+
+### 🚩 Feature Flags
+
+Agency-hotel authorization enforcement is controlled by:
+
+```yaml
+features:
+  enforce-agency-hotel-auth: false
+```
+
+When enabled, AGENCY create/read/list operations require an `ACTIVE` `agency_hotel_auth` row
+for the target hotel whose validity window includes the reservation `arrival_date`.
 
 ### 🔐 Authentication (JWT)
 
@@ -137,6 +150,7 @@ curl http://localhost:8080/reservations \
 
 * Reservation endpoints use bearer authentication.
 * Legacy actor headers (`X-User-Id`, `X-Role`, `X-Hotel-Id`, `X-Agency-Id`) are disabled.
+* If agency-hotel auth is enabled and denied, API returns `403` with code `agency_not_authorized_for_hotel`.
 
 ### 📤 Export Endpoints
 

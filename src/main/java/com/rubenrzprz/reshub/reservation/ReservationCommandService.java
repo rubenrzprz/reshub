@@ -3,6 +3,7 @@ package com.rubenrzprz.reshub.reservation;
 import com.rubenrzprz.reshub.api.ApiProblemException;
 import com.rubenrzprz.reshub.security.RequestActor;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -23,10 +24,16 @@ public class ReservationCommandService {
 
   private final JdbcTemplate jdbc;
   private final ReservationQueryService reservationQueryService;
+  private final AgencyHotelAuthorizationService agencyHotelAuthorizationService;
 
-  public ReservationCommandService(JdbcTemplate jdbc, ReservationQueryService reservationQueryService) {
+  public ReservationCommandService(
+    JdbcTemplate jdbc,
+    ReservationQueryService reservationQueryService,
+    AgencyHotelAuthorizationService agencyHotelAuthorizationService
+  ) {
     this.jdbc = jdbc;
     this.reservationQueryService = reservationQueryService;
+    this.agencyHotelAuthorizationService = agencyHotelAuthorizationService;
   }
 
   public ReservationView updateNotes(UUID reservationId, String notes, RequestActor actor) {
@@ -234,8 +241,22 @@ public class ReservationCommandService {
       case ADMIN -> {
       }
       case MANAGER, RECEPTIONIST -> ReservationRbacGuards.requireHotelScope(actor, request.hotelId(), onDeny);
-      case AGENCY -> ReservationRbacGuards.requireAgencyScope(actor, request.agencyId(), onDeny);
+      case AGENCY -> {
+        ReservationRbacGuards.requireAgencyScope(actor, request.agencyId(), onDeny);
+        enforceAgencyHotelAuthorization(actor, request.hotelId(), request.arrivalDate(), onDeny);
+      }
       default -> onDeny.accept(ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
+    }
+  }
+
+  private void enforceAgencyHotelAuthorization(
+    RequestActor actor,
+    UUID hotelId,
+    LocalDate arrivalDate,
+    Consumer<String> onDeny
+  ) {
+    if (!agencyHotelAuthorizationService.isAgencyAuthorizedForHotelOnDate(actor, hotelId, arrivalDate)) {
+      onDeny.accept(ReservationRbacLog.REASON_AGENCY_HOTEL_AUTH_MISSING_OR_INVALID);
     }
   }
 
@@ -297,6 +318,13 @@ public class ReservationCommandService {
         reason
       )
     );
+    if (ReservationRbacLog.REASON_AGENCY_HOTEL_AUTH_MISSING_OR_INVALID.equals(reason)) {
+      throw new ApiProblemException(
+        HttpStatus.FORBIDDEN,
+        "agency_not_authorized_for_hotel",
+        "agency is not authorized for hotel"
+      );
+    }
     throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
   }
 

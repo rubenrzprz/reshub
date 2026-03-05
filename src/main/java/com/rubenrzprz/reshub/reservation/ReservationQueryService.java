@@ -22,9 +22,14 @@ public class ReservationQueryService {
   private static final Logger log = LoggerFactory.getLogger(ReservationQueryService.class);
 
   private final JdbcTemplate jdbc;
+  private final AgencyHotelAuthorizationService agencyHotelAuthorizationService;
 
-  public ReservationQueryService(JdbcTemplate jdbc) {
+  public ReservationQueryService(
+    JdbcTemplate jdbc,
+    AgencyHotelAuthorizationService agencyHotelAuthorizationService
+  ) {
     this.jdbc = jdbc;
+    this.agencyHotelAuthorizationService = agencyHotelAuthorizationService;
   }
 
   public ReservationView getById(UUID reservationId, RequestActor actor) {
@@ -184,6 +189,7 @@ public class ReservationQueryService {
       case AGENCY -> {
         sql.append("agency_id = ? ");
         args.add(actor.agencyId());
+        appendAgencyHotelAuthorizationFilter(sql, args, actor);
       }
       default -> throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
     }
@@ -216,19 +222,62 @@ public class ReservationQueryService {
     }
   }
 
+  private void appendAgencyHotelAuthorizationFilter(
+    StringBuilder sql,
+    List<Object> args,
+    RequestActor actor
+  ) {
+    if (!agencyHotelAuthorizationService.isAgencyAuthEnforced(actor)) {
+      return;
+    }
+    sql.append("and exists (");
+    sql.append("select 1 from agency_hotel_auth aha ");
+    sql.append("where aha.agency_id = ? ");
+    sql.append("and aha.hotel_id = reservation.hotel_id ");
+    sql.append("and aha.status = 'ACTIVE' ");
+    sql.append("and (aha.valid_from is null or aha.valid_from <= reservation.arrival_date) ");
+    sql.append("and (aha.valid_to is null or aha.valid_to >= reservation.arrival_date)");
+    sql.append(") ");
+    args.add(actor.agencyId());
+  }
+
   private void enforceReadAccess(RequestActor actor, ReservationView reservation) {
     Consumer<String> onDeny = reason -> deny(actor, reservation.id(), reason);
     switch (actor.role()) {
       case ADMIN -> {
       }
       case MANAGER, RECEPTIONIST -> ReservationRbacGuards.requireHotelScope(actor, reservation.hotelId(), onDeny);
-      case AGENCY -> ReservationRbacGuards.requireAgencyScope(actor, reservation.agencyId(), onDeny);
+      case AGENCY -> {
+        ReservationRbacGuards.requireAgencyScope(actor, reservation.agencyId(), onDeny);
+        enforceAgencyHotelAuthorization(actor, reservation, onDeny);
+      }
       default -> onDeny.accept(ReservationRbacLog.REASON_UNSUPPORTED_ROLE);
+    }
+  }
+
+  private void enforceAgencyHotelAuthorization(
+    RequestActor actor,
+    ReservationView reservation,
+    Consumer<String> onDeny
+  ) {
+    if (!agencyHotelAuthorizationService.isAgencyAuthorizedForHotelOnDate(
+      actor,
+      reservation.hotelId(),
+      reservation.arrivalDate()
+    )) {
+      onDeny.accept(ReservationRbacLog.REASON_AGENCY_HOTEL_AUTH_MISSING_OR_INVALID);
     }
   }
 
   private void deny(RequestActor actor, UUID reservationId, String reason) {
     log.warn("{}", ReservationRbacLog.readFields(actor, reservationId, "DENY", reason));
+    if (ReservationRbacLog.REASON_AGENCY_HOTEL_AUTH_MISSING_OR_INVALID.equals(reason)) {
+      throw new ApiProblemException(
+        HttpStatus.FORBIDDEN,
+        "agency_not_authorized_for_hotel",
+        "agency is not authorized for hotel"
+      );
+    }
     throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
   }
 
