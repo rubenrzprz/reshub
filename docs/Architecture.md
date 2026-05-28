@@ -49,6 +49,7 @@
 ## 2) 🏷️ Tenancy & Conventions
 
 - **Tenancy:** single DB; reference & operational rows scoped by `hotel_id` where applicable.
+- **Persistence:** Flyway owns schema migrations; Spring Data JPA handles core aggregate commands/lookups; explicit SQL remains for role-scoped list/export/keyset queries.
 - **PKs:** UUID (application-assigned) — avoids DB extensions.
 - **Time:** `TIMESTAMPTZ` in UTC; JVM `-Duser.timezone=UTC`.  
 - **Naming:** snake_case table/column names; singular table names.

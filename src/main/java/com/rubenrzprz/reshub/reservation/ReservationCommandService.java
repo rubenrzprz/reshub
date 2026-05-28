@@ -1,12 +1,12 @@
 package com.rubenrzprz.reshub.reservation;
 
 import com.rubenrzprz.reshub.api.ApiProblemException;
+import com.rubenrzprz.reshub.persistence.ReservationCommentEntity;
+import com.rubenrzprz.reshub.persistence.ReservationCommentRepository;
+import com.rubenrzprz.reshub.persistence.ReservationEntity;
+import com.rubenrzprz.reshub.persistence.ReservationRepository;
 import com.rubenrzprz.reshub.security.RequestActor;
-import java.sql.Timestamp;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -14,34 +14,40 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ReservationCommandService {
 
   private static final Logger log = LoggerFactory.getLogger(ReservationCommandService.class);
 
-  private final JdbcTemplate jdbc;
+  private final ReservationRepository reservationRepository;
+  private final ReservationCommentRepository reservationCommentRepository;
   private final ReservationQueryService reservationQueryService;
   private final AgencyHotelAuthorizationService agencyHotelAuthorizationService;
 
   public ReservationCommandService(
-    JdbcTemplate jdbc,
+    ReservationRepository reservationRepository,
+    ReservationCommentRepository reservationCommentRepository,
     ReservationQueryService reservationQueryService,
     AgencyHotelAuthorizationService agencyHotelAuthorizationService
   ) {
-    this.jdbc = jdbc;
+    this.reservationRepository = reservationRepository;
+    this.reservationCommentRepository = reservationCommentRepository;
     this.reservationQueryService = reservationQueryService;
     this.agencyHotelAuthorizationService = agencyHotelAuthorizationService;
   }
 
+  @Transactional
   public ReservationView updateNotes(UUID reservationId, String notes, RequestActor actor) {
-    ReservationScope scope = loadScope(reservationId, actor);
+    ReservationEntity reservation = loadReservation(reservationId, actor, ReservationRbacLog.EVENT_UPDATE_NOT_FOUND);
+    ReservationScope scope = toScope(reservation);
     enforceMutationAccess(actor, scope, ReservationRbacLog.EVENT_UPDATE_FORBIDDEN);
 
     try {
-      jdbc.update("update reservation set notes = ?, updated_at = now() where id = ?", notes, reservationId);
+      reservation.setNotes(notes);
+      reservationRepository.flush();
     } catch (DataAccessException ex) {
       throw mapMutationViolation(ex);
     }
@@ -60,6 +66,7 @@ public class ReservationCommandService {
     return reservationQueryService.getById(reservationId, actor);
   }
 
+  @Transactional
   public ReservationView createReservation(ReservationCreateRequest request, RequestActor actor) {
     validateCreateRequest(request);
     enforceCreateAccess(actor, request);
@@ -69,11 +76,7 @@ public class ReservationCommandService {
     int children = request.children() == null ? 0 : request.children();
 
     try {
-      jdbc.update(
-        "insert into reservation " +
-          "(id, hotel_id, agency_id, created_by_user_id, room_type_id, external_room_type_code, external_room_type_name, " +
-          "external_ref, status, arrival_date, departure_date, guest_name, adults, children, notes) " +
-          "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      ReservationEntity reservation = ReservationEntity.create(
         reservationId,
         request.hotelId(),
         request.agencyId(),
@@ -82,14 +85,14 @@ public class ReservationCommandService {
         request.externalRoomTypeCode(),
         request.externalRoomTypeName(),
         request.externalRef(),
-        "NEW",
-        java.sql.Date.valueOf(request.arrivalDate()),
-        java.sql.Date.valueOf(request.departureDate()),
+        request.arrivalDate(),
+        request.departureDate(),
         request.guestName(),
-        adults,
-        children,
+        (short) adults,
+        (short) children,
         request.notes()
       );
+      reservationRepository.saveAndFlush(reservation);
     } catch (DataIntegrityViolationException ex) {
       String message = ex.getMostSpecificCause() == null ? "" : ex.getMostSpecificCause().getMessage();
       if (message.contains("reservation_external_ref_unique")) {
@@ -133,34 +136,37 @@ public class ReservationCommandService {
     return reservationQueryService.getById(reservationId, actor);
   }
 
+  @Transactional
   public ReservationView confirm(UUID reservationId, RequestActor actor) {
     return changeStatus(reservationId, actor, "CONFIRMED", null);
   }
 
+  @Transactional
   public ReservationView cancel(UUID reservationId, String reason, RequestActor actor) {
     return changeStatus(reservationId, actor, "CANCELLED", reason);
   }
 
+  @Transactional
   public ReservationView noShow(UUID reservationId, RequestActor actor) {
     return changeStatus(reservationId, actor, "NOSHOW", null);
   }
 
+  @Transactional
   public ReservationCommentView addComment(UUID reservationId, String body, RequestActor actor) {
     if (body == null || body.isBlank()) {
       throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_comment_payload", "comment body is required");
     }
 
-    ReservationScope scope = loadScope(reservationId, actor, ReservationRbacLog.EVENT_COMMENT_NOT_FOUND);
+    ReservationEntity reservation = loadReservation(reservationId, actor, ReservationRbacLog.EVENT_COMMENT_NOT_FOUND);
+    ReservationScope scope = toScope(reservation);
     enforceCommentAccess(actor, scope);
 
-    UUID commentId = UUID.randomUUID();
-    jdbc.update(
-      "insert into reservation_comment (id, reservation_id, author_user_id, body) values (?, ?, ?, ?)",
-      commentId,
+    ReservationCommentEntity comment = reservationCommentRepository.saveAndFlush(new ReservationCommentEntity(
+      UUID.randomUUID(),
       reservationId,
       actor.userId(),
       body
-    );
+    ));
 
     log.debug(
       "{}",
@@ -174,33 +180,17 @@ public class ReservationCommandService {
     );
     emitAdminWriteAudit(actor, reservationId, "create_comment");
 
-    return jdbc.queryForObject(
-      "select id, reservation_id, author_user_id, body, created_at from reservation_comment where id = ?",
-      (rs, rowNum) -> new ReservationCommentView(
-        UUID.fromString(rs.getString("id")),
-        UUID.fromString(rs.getString("reservation_id")),
-        UUID.fromString(rs.getString("author_user_id")),
-        rs.getString("body"),
-        toOffsetDateTime(rs.getTimestamp("created_at"))
-      ),
-      commentId
+    return new ReservationCommentView(
+      comment.getId(),
+      comment.getReservationId(),
+      comment.getAuthorUserId(),
+      comment.getBody(),
+      comment.getCreatedAt()
     );
   }
 
-  private ReservationScope loadScope(UUID reservationId, RequestActor actor, String notFoundEvent) {
-    List<ReservationScope> rows = jdbc.query(
-      "select id, hotel_id, agency_id, created_by_user_id, status from reservation where id = ?",
-      (rs, rowNum) -> new ReservationScope(
-        UUID.fromString(rs.getString("id")),
-        UUID.fromString(rs.getString("hotel_id")),
-        UUID.fromString(rs.getString("agency_id")),
-        UUID.fromString(rs.getString("created_by_user_id")),
-        rs.getString("status")
-      ),
-      reservationId
-    );
-
-    if (rows.isEmpty()) {
+  private ReservationEntity loadReservation(UUID reservationId, RequestActor actor, String notFoundEvent) {
+    return reservationRepository.findById(reservationId).orElseThrow(() -> {
       log.warn(
         "event={} actorUserId={} actorRole={} actorHotelId={} actorAgencyId={} reservationId={} reason=not_found",
         notFoundEvent,
@@ -210,14 +200,18 @@ public class ReservationCommandService {
         actor.agencyId(),
         reservationId
       );
-      throw new ApiProblemException(HttpStatus.NOT_FOUND, "reservation_not_found", "reservation not found");
-    }
-
-    return rows.getFirst();
+      return new ApiProblemException(HttpStatus.NOT_FOUND, "reservation_not_found", "reservation not found");
+    });
   }
 
-  private ReservationScope loadScope(UUID reservationId, RequestActor actor) {
-    return loadScope(reservationId, actor, ReservationRbacLog.EVENT_UPDATE_NOT_FOUND);
+  private ReservationScope toScope(ReservationEntity reservation) {
+    return new ReservationScope(
+      reservation.getId(),
+      reservation.getHotelId(),
+      reservation.getAgencyId(),
+      reservation.getCreatedByUserId(),
+      reservation.getStatus()
+    );
   }
 
   private void enforceMutationAccess(RequestActor actor, ReservationScope scope, String forbiddenEvent) {
@@ -328,12 +322,9 @@ public class ReservationCommandService {
     throw new ApiProblemException(HttpStatus.FORBIDDEN, "forbidden_scope", "forbidden reservation scope");
   }
 
-  private OffsetDateTime toOffsetDateTime(Timestamp timestamp) {
-    return timestamp == null ? null : timestamp.toInstant().atOffset(ZoneOffset.UTC);
-  }
-
   private ReservationView changeStatus(UUID reservationId, RequestActor actor, String targetStatus, String cancelReason) {
-    ReservationScope scope = loadScope(reservationId, actor, ReservationRbacLog.EVENT_STATUS_NOT_FOUND);
+    ReservationEntity reservation = loadReservation(reservationId, actor, ReservationRbacLog.EVENT_STATUS_NOT_FOUND);
+    ReservationScope scope = toScope(reservation);
     enforceMutationAccess(actor, scope, ReservationRbacLog.EVENT_STATUS_FORBIDDEN);
 
     if (!isAllowedTransition(scope.status(), targetStatus)) {
@@ -356,19 +347,13 @@ public class ReservationCommandService {
 
     try {
       if ("CANCELLED".equals(targetStatus)) {
-        jdbc.update(
-          "update reservation set status = ?, cancelled_at = now(), cancel_reason = ?, updated_at = now() where id = ?",
-          targetStatus,
-          cancelReason,
-          reservationId
-        );
+        reservation.cancel(cancelReason);
+      } else if ("CONFIRMED".equals(targetStatus)) {
+        reservation.confirm();
       } else {
-        jdbc.update(
-          "update reservation set status = ?, cancelled_at = null, cancel_reason = null, updated_at = now() where id = ?",
-          targetStatus,
-          reservationId
-        );
+        reservation.noShow();
       }
+      reservationRepository.flush();
     } catch (DataAccessException ex) {
       throw mapMutationViolation(ex);
     }
