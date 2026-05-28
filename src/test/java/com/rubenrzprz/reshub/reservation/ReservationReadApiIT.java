@@ -381,4 +381,18 @@ public class ReservationReadApiIT extends ReservationApiIntegrationTestBase {
       .expectBody()
       .jsonPath("$.code").isEqualTo("invalid_date_range");
   }
+
+  @Test
+  void invalidDateQueryParameterIsBadRequest() {
+    client.get().uri(uriBuilder -> uriBuilder.path("/reservations")
+        .queryParam("arrivalFrom", "not-a-date")
+        .queryParam("limit", 50)
+        .build())
+      .header("Authorization", "Bearer " + managerToken)
+      .exchange()
+      .expectStatus().isBadRequest()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("invalid_request_parameter")
+      .jsonPath("$.parameter").isEqualTo("arrivalFrom");
+  }
 }

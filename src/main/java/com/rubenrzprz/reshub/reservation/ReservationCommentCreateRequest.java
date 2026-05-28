@@ -1,4 +1,9 @@
 package com.rubenrzprz.reshub.reservation;
 
-public record ReservationCommentCreateRequest(String body) {
+import jakarta.validation.constraints.NotBlank;
+
+public record ReservationCommentCreateRequest(
+  @NotBlank
+  String body
+) {
 }

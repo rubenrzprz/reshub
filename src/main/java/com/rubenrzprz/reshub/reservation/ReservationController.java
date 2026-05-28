@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -144,7 +145,7 @@ public class ReservationController {
   @PostMapping("/reservations")
   @ResponseStatus(HttpStatus.CREATED)
   public ReservationView create(
-    @RequestBody ReservationCreateRequest request,
+    @Valid @RequestBody ReservationCreateRequest request,
     @RequestHeader(name = "X-User-Id", required = false) String userId,
     @RequestHeader(name = "X-Role", required = false) String role,
     @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
@@ -162,7 +163,7 @@ public class ReservationController {
   @PatchMapping("/reservations/{id}/notes")
   public ReservationView updateNotes(
     @PathVariable UUID id,
-    @RequestBody ReservationNotesUpdateRequest request,
+    @Valid @RequestBody ReservationNotesUpdateRequest request,
     @RequestHeader(name = "X-User-Id", required = false) String userId,
     @RequestHeader(name = "X-Role", required = false) String role,
     @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
@@ -182,7 +183,7 @@ public class ReservationController {
   @ResponseStatus(HttpStatus.CREATED)
   public ReservationCommentView addComment(
     @PathVariable UUID id,
-    @RequestBody ReservationCommentCreateRequest request,
+    @Valid @RequestBody ReservationCommentCreateRequest request,
     @RequestHeader(name = "X-User-Id", required = false) String userId,
     @RequestHeader(name = "X-Role", required = false) String role,
     @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
@@ -219,7 +220,7 @@ public class ReservationController {
   @PostMapping("/reservations/{id}/cancel")
   public ReservationView cancel(
     @PathVariable UUID id,
-    @RequestBody(required = false) ReservationCancelRequest request,
+    @Valid @RequestBody(required = false) ReservationCancelRequest request,
     @RequestHeader(name = "X-User-Id", required = false) String userId,
     @RequestHeader(name = "X-Role", required = false) String role,
     @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,

@@ -42,6 +42,29 @@ class AuthApiIT extends AuthApiIntegrationTestBase {
   }
 
   @Test
+  void invalidAuthPayloadReturnsValidationProblem() {
+    client.post().uri("/auth/token")
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of("email", "not-an-email", "password", VALID_PASSWORD))
+      .exchange()
+      .expectStatus().isBadRequest()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("validation_failed")
+      .jsonPath("$.errors[0].field").isEqualTo("email");
+  }
+
+  @Test
+  void malformedAuthJsonReturnsInvalidRequestBody() {
+    client.post().uri("/auth/token")
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue("{")
+      .exchange()
+      .expectStatus().isBadRequest()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("invalid_request_body");
+  }
+
+  @Test
   void missingBearerOnReservationsReturnsUnauthorized() {
     client.get().uri("/reservations")
       .exchange()
