@@ -72,6 +72,11 @@ High-level overview of the domain & data model. For the full spec, see **[docs/A
 ResHub is designed to be run as a **full local stack** using Docker Compose.
 This guarantees the same behavior locally, in CI, and in future environments.
 
+### Requirements
+
+* **Java 21** for Maven builds and tests. The build enforces Java 21 so local runs match CI.
+* **Docker** for Docker Compose and Testcontainers-backed integration tests.
+
 ### 🐳 Run with Docker Compose (API + DB)
 
 One command builds and runs the complete development stack:
@@ -113,6 +118,8 @@ docker compose up --build
 ```bash
 mvn -q verify
 ```
+
+Run this command with a Java 21 JDK. Newer JDKs are rejected by Maven Enforcer so failures are explicit instead of surfacing as test framework incompatibilities.
 
 * Integration tests that hit PostgreSQL use **Testcontainers**.
 * The test suite verifies that the baseline database schema is applied.
