@@ -110,7 +110,7 @@ docker compose up --build
 #### 📌 Notes
 
 * On startup, **Flyway automatically applies database migrations**.
-* The API runs with the `dev` profile when started via Docker Compose.
+* The API runs with the `dev` profile when started via Docker Compose, including demo seed data.
 * If port `8080` is busy, set `APP_PORT=8081` in `.env` and re-run.
 * `JWT_SECRET` is required; startup fails if missing/weak.
 * Stop with `Ctrl + C` (foreground) or `docker compose down`.
@@ -140,12 +140,21 @@ for the target hotel whose validity window includes the reservation `arrival_dat
 
 ### 🔐 Authentication (JWT)
 
+Docker Compose runs the API with the `dev` profile and seeds these demo users:
+
+| Role | Email | Password |
+|------|-------|----------|
+| ADMIN | `admin@reshub.local` | `secret123` |
+| MANAGER | `manager@reshub.local` | `secret123` |
+| RECEPTIONIST | `reception@reshub.local` | `secret123` |
+| AGENCY | `agency@reshub.local` | `secret123` |
+
 1. Request a token:
 
 ```bash
 curl -X POST http://localhost:8080/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"email":"<user-email>","password":"<user-password>"}'
+  -d '{"email":"manager@reshub.local","password":"secret123"}'
 ```
 
 2. Use the `accessToken` value as bearer token:
@@ -159,6 +168,7 @@ curl http://localhost:8080/reservations \
 
 * Reservation endpoints use bearer authentication.
 * Legacy actor headers (`X-User-Id`, `X-Role`, `X-Hotel-Id`, `X-Agency-Id`) are disabled.
+* Demo users are loaded only by the `dev` Flyway location (`classpath:db/dev`), not by test or production profiles.
 * If agency-hotel auth is enabled and denied, API returns `403` with code `agency_not_authorized_for_hotel`.
 
 ### 📤 Export Endpoints
