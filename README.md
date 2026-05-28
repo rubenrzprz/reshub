@@ -48,6 +48,7 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 | 🗄️ **Database**  | PostgreSQL 16                             |
 | 🧾 **Persistence**| Spring Data JPA + targeted JdbcTemplate  |
 | 🔁 **Migrations** | Flyway                                    |
+| 🔐 **Security**   | Spring Security + JWT                    |
 | 🧪 **Testing**    | JUnit 5, Spring Boot Test, Testcontainers |
 | 📚 **API Docs**   | OpenAPI (springdoc)                       |
 | ▶️ **Runtime**    | Docker / Docker Compose                   |
@@ -166,8 +167,9 @@ curl http://localhost:8080/reservations \
 
 #### 📌 Notes
 
-* Reservation endpoints use bearer authentication.
-* Legacy actor headers (`X-User-Id`, `X-Role`, `X-Hotel-Id`, `X-Agency-Id`) are disabled.
+* Reservation endpoints use Spring Security bearer authentication.
+* JWT claims are resolved into `SecurityContext`; service-level RBAC still enforces tenant scope and ownership.
+* Legacy actor headers (`X-User-Id`, `X-Role`, `X-Hotel-Id`, `X-Agency-Id`) are not accepted as authentication.
 * Demo users are loaded only by the `dev` Flyway location (`classpath:db/dev`), not by test or production profiles.
 * If agency-hotel auth is enabled and denied, API returns `403` with code `agency_not_authorized_for_hotel`.
 

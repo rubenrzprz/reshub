@@ -8,13 +8,18 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
+import java.io.IOException;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
-
-import java.io.IOException;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -52,31 +57,28 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     try {
       String token = extractBearerToken(request.getHeader("Authorization"));
       if (token == null) {
-        throw new ApiProblemException(
-          HttpStatus.UNAUTHORIZED,
-          "unauthorized_actor_context",
-          "missing bearer token"
-        );
+        filterChain.doFilter(request, response);
+        return;
       }
 
       Jws<Claims> parsed = jwtService.parseAndValidate(token);
       Claims claims = parsed.getPayload();
+      RequestActor actor = toActor(claims);
+      AuthenticatedActor principal = new AuthenticatedActor(actor);
+      UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+        principal,
+        token,
+        List.of(new SimpleGrantedAuthority("ROLE_" + actor.role().name()))
+      );
+      authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-      String userId = claims.getSubject();
-      String role = claims.get("role", String.class);
-      String hotelId = claims.get("hotelId", String.class);
-      String agencyId = claims.get("agencyId", String.class);
-
-      ActorHeaderRequestWrapper wrapped = new ActorHeaderRequestWrapper(request);
-      wrapped.putHeader("X-User-Id", userId);
-      wrapped.putHeader("X-Role", role);
-      wrapped.putHeader("X-Hotel-Id", hotelId);
-      wrapped.putHeader("X-Agency-Id", agencyId);
-
-      filterChain.doFilter(wrapped, response);
+      SecurityContextHolder.getContext().setAuthentication(authentication);
+      filterChain.doFilter(request, response);
     } catch (ApiProblemException ex) {
+      SecurityContextHolder.clearContext();
       resolver.resolveException(request, response, null, ex);
     } catch (JwtException | IllegalArgumentException ex) {
+      SecurityContextHolder.clearContext();
       resolver.resolveException(
         request,
         response,
@@ -95,6 +97,68 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
     String token = authHeader.substring(BEARER_PREFIX_LENGTH).trim();
     return token.isBlank() ? null : token;
+  }
+
+  private RequestActor toActor(Claims claims) {
+    UUID userId = parseUuid(claims.getSubject(), "subject");
+    RequestActor.Role role = parseRole(claims.get("role", String.class));
+    UUID hotelId = parseOptionalUuid(claims.get("hotelId", String.class), "hotelId");
+    UUID agencyId = parseOptionalUuid(claims.get("agencyId", String.class), "agencyId");
+
+    if (role == RequestActor.Role.AGENCY && agencyId == null) {
+      throw new ApiProblemException(
+        HttpStatus.UNAUTHORIZED,
+        "unauthorized_actor_context",
+        "agency actor requires agencyId"
+      );
+    }
+
+    if ((role == RequestActor.Role.MANAGER || role == RequestActor.Role.RECEPTIONIST) && hotelId == null) {
+      throw new ApiProblemException(
+        HttpStatus.UNAUTHORIZED,
+        "unauthorized_actor_context",
+        "staff actor requires hotelId"
+      );
+    }
+
+    return new RequestActor(userId, role, hotelId, agencyId);
+  }
+
+  private UUID parseOptionalUuid(String value, String claim) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return parseUuid(value, claim);
+  }
+
+  private UUID parseUuid(String value, String claim) {
+    if (value == null || value.isBlank()) {
+      throw new ApiProblemException(
+        HttpStatus.UNAUTHORIZED,
+        "unauthorized_actor_context",
+        "missing " + claim + " claim"
+      );
+    }
+    try {
+      return UUID.fromString(value);
+    } catch (IllegalArgumentException ex) {
+      throw new ApiProblemException(
+        HttpStatus.UNAUTHORIZED,
+        "unauthorized_actor_context",
+        "invalid UUID in " + claim + " claim"
+      );
+    }
+  }
+
+  private RequestActor.Role parseRole(String value) {
+    if (value == null || value.isBlank()) {
+      throw new ApiProblemException(HttpStatus.UNAUTHORIZED, "unauthorized_actor_context", "missing role claim");
+    }
+    try {
+      return RequestActor.Role.valueOf(value);
+    } catch (IllegalArgumentException ex) {
+      throw new ApiProblemException(HttpStatus.UNAUTHORIZED, "unauthorized_actor_context", "invalid role claim");
+    }
   }
 
 }
