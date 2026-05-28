@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -54,13 +53,9 @@ public class ReservationController {
   @ApiResponse(responseCode = "404", description = "Reservation not found")
   @GetMapping("/reservations/{id}")
   public ReservationView getById(
-    @PathVariable UUID id,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @PathVariable UUID id
   ) {
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     return reservationQueryService.getById(id, actor);
   }
 
@@ -76,17 +71,13 @@ public class ReservationController {
     @RequestParam(name = "status", required = false) String status,
     @RequestParam(name = "arrivalFrom", required = false) LocalDate arrivalFrom,
     @RequestParam(name = "arrivalTo", required = false) LocalDate arrivalTo,
-    @RequestParam(name = "guestQuery", required = false) String guestQuery,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @RequestParam(name = "guestQuery", required = false) String guestQuery
   ) {
     if (limit < 1 || limit > 200) {
       throw new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid_limit", "limit must be between 1 and 200");
     }
     validateDateRange(arrivalFrom, arrivalTo);
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     return reservationQueryService.list(actor, limit, cursor, status, arrivalFrom, arrivalTo, guestQuery);
   }
 
@@ -99,14 +90,10 @@ public class ReservationController {
     @RequestParam(name = "status", required = false) String status,
     @RequestParam(name = "arrivalFrom", required = false) LocalDate arrivalFrom,
     @RequestParam(name = "arrivalTo", required = false) LocalDate arrivalTo,
-    @RequestParam(name = "guestQuery", required = false) String guestQuery,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @RequestParam(name = "guestQuery", required = false) String guestQuery
   ) {
     validateDateRange(arrivalFrom, arrivalTo);
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     List<ReservationView> items = reservationQueryService.export(actor, status, arrivalFrom, arrivalTo, guestQuery);
     return new ReservationExportResponse(items);
   }
@@ -120,14 +107,10 @@ public class ReservationController {
     @RequestParam(name = "status", required = false) String status,
     @RequestParam(name = "arrivalFrom", required = false) LocalDate arrivalFrom,
     @RequestParam(name = "arrivalTo", required = false) LocalDate arrivalTo,
-    @RequestParam(name = "guestQuery", required = false) String guestQuery,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @RequestParam(name = "guestQuery", required = false) String guestQuery
   ) {
     validateDateRange(arrivalFrom, arrivalTo);
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     List<ReservationView> items = reservationQueryService.export(actor, status, arrivalFrom, arrivalTo, guestQuery);
     String csv = toCsv(items);
     return ResponseEntity.ok()
@@ -145,13 +128,9 @@ public class ReservationController {
   @PostMapping("/reservations")
   @ResponseStatus(HttpStatus.CREATED)
   public ReservationView create(
-    @Valid @RequestBody ReservationCreateRequest request,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @Valid @RequestBody ReservationCreateRequest request
   ) {
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     return reservationCommandService.createReservation(request, actor);
   }
 
@@ -163,13 +142,9 @@ public class ReservationController {
   @PatchMapping("/reservations/{id}/notes")
   public ReservationView updateNotes(
     @PathVariable UUID id,
-    @Valid @RequestBody ReservationNotesUpdateRequest request,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @Valid @RequestBody ReservationNotesUpdateRequest request
   ) {
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     return reservationCommandService.updateNotes(id, request.notes(), actor);
   }
 
@@ -183,13 +158,9 @@ public class ReservationController {
   @ResponseStatus(HttpStatus.CREATED)
   public ReservationCommentView addComment(
     @PathVariable UUID id,
-    @Valid @RequestBody ReservationCommentCreateRequest request,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @Valid @RequestBody ReservationCommentCreateRequest request
   ) {
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     return reservationCommandService.addComment(id, request.body(), actor);
   }
 
@@ -201,13 +172,9 @@ public class ReservationController {
   @ApiResponse(responseCode = "409", description = "Invalid status transition")
   @PostMapping("/reservations/{id}/confirm")
   public ReservationView confirm(
-    @PathVariable UUID id,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @PathVariable UUID id
   ) {
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     return reservationCommandService.confirm(id, actor);
   }
 
@@ -220,13 +187,9 @@ public class ReservationController {
   @PostMapping("/reservations/{id}/cancel")
   public ReservationView cancel(
     @PathVariable UUID id,
-    @Valid @RequestBody(required = false) ReservationCancelRequest request,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @Valid @RequestBody(required = false) ReservationCancelRequest request
   ) {
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     return reservationCommandService.cancel(id, request == null ? null : request.reason(), actor);
   }
 
@@ -238,13 +201,9 @@ public class ReservationController {
   @ApiResponse(responseCode = "409", description = "Invalid status transition")
   @PostMapping("/reservations/{id}/noshow")
   public ReservationView noShow(
-    @PathVariable UUID id,
-    @RequestHeader(name = "X-User-Id", required = false) String userId,
-    @RequestHeader(name = "X-Role", required = false) String role,
-    @RequestHeader(name = "X-Hotel-Id", required = false) String hotelId,
-    @RequestHeader(name = "X-Agency-Id", required = false) String agencyId
+    @PathVariable UUID id
   ) {
-    RequestActor actor = actorResolver.resolve(userId, role, hotelId, agencyId);
+    RequestActor actor = actorResolver.resolve();
     return reservationCommandService.noShow(id, actor);
   }
 
