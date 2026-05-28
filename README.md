@@ -58,6 +58,7 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 ## 📐 Architecture
 
 High-level overview of the domain & data model. For the full spec, see **[docs/Architecture.md](docs/Architecture.md)**.
+Technical decision records live in **[docs/decisions](docs/decisions)**.
 
 - **Tenancy:** single DB; entities scoped by `hotel_id` where applicable.
 - **Persistence:** Spring Data JPA for core aggregate commands/lookups; explicit `JdbcTemplate` SQL for role-scoped list/export queries.
