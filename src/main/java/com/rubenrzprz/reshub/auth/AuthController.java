@@ -3,6 +3,7 @@ package com.rubenrzprz.reshub.auth;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,7 +23,7 @@ public class AuthController {
   @ApiResponse(responseCode = "400", description = "Invalid auth payload")
   @ApiResponse(responseCode = "401", description = "Invalid credentials")
   @PostMapping("/auth/token")
-  public TokenResponse token(@RequestBody TokenRequest request) {
+  public TokenResponse token(@Valid @RequestBody TokenRequest request) {
     return authService.issueToken(request);
   }
 }

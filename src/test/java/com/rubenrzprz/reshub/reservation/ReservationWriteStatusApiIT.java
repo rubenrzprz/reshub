@@ -307,6 +307,28 @@ public class ReservationWriteStatusApiIT extends ReservationApiIntegrationTestBa
   }
 
   @Test
+  void invalidCreateFieldReturnsValidationProblem() {
+    client.post().uri("/reservations")
+      .header("Authorization", "Bearer " + managerToken)
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(Map.of(
+        "hotelId", seed.hotelId().toString(),
+        "agencyId", seed.agencyId().toString(),
+        "externalRef", "ext-create-invalid-field",
+        "arrivalDate", "2026-02-25",
+        "departureDate", "2026-02-26",
+        "guestName", "Bad Field Guest",
+        "adults", 0,
+        "children", 0
+      ))
+      .exchange()
+      .expectStatus().isBadRequest()
+      .expectBody()
+      .jsonPath("$.code").isEqualTo("validation_failed")
+      .jsonPath("$.errors[0].field").isEqualTo("adults");
+  }
+
+  @Test
   void cancelledReservationCannotBeUpdated() {
     client.post().uri("/reservations/{id}/cancel", reservationId)
       .header("Authorization", "Bearer " + managerToken)

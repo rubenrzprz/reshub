@@ -1,11 +1,16 @@
 package com.rubenrzprz.reshub.api;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
@@ -17,6 +22,35 @@ public class ApiExceptionHandler {
     pd.setTitle(titleFor(ex.status()));
     pd.setProperty("code", ex.code());
     pd.setProperty("path", request.getRequestURI());
+    return pd;
+  }
+
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "request validation failed");
+    pd.setTitle("Bad Request");
+    pd.setProperty("code", "validation_failed");
+    pd.setProperty("path", request.getRequestURI());
+    pd.setProperty("errors", validationErrors(ex));
+    return pd;
+  }
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  ProblemDetail handleUnreadableMessage(HttpMessageNotReadableException ex, HttpServletRequest request) {
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "malformed request body");
+    pd.setTitle("Bad Request");
+    pd.setProperty("code", "invalid_request_body");
+    pd.setProperty("path", request.getRequestURI());
+    return pd;
+  }
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "invalid request parameter");
+    pd.setTitle("Bad Request");
+    pd.setProperty("code", "invalid_request_parameter");
+    pd.setProperty("path", request.getRequestURI());
+    pd.setProperty("parameter", ex.getName());
     return pd;
   }
 
@@ -79,5 +113,20 @@ public class ApiExceptionHandler {
       return "bad_request";
     }
     return "request_failed";
+  }
+
+  private List<ValidationError> validationErrors(MethodArgumentNotValidException ex) {
+    return ex.getBindingResult()
+      .getFieldErrors()
+      .stream()
+      .map(this::validationError)
+      .toList();
+  }
+
+  private ValidationError validationError(FieldError error) {
+    return new ValidationError(error.getField(), error.getDefaultMessage());
+  }
+
+  private record ValidationError(String field, String message) {
   }
 }
