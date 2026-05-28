@@ -22,7 +22,6 @@ public abstract class PostgresIntegrationTestBase {
     r.add("spring.datasource.url", postgres::getJdbcUrl);
     r.add("spring.datasource.username", postgres::getUsername);
     r.add("spring.datasource.password", postgres::getPassword);
-    r.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     r.add("spring.flyway.enabled", () -> "true");
   }
 }

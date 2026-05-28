@@ -49,6 +49,7 @@
 ## 2) 🏷️ Tenancy & Conventions
 
 - **Tenancy:** single DB; reference & operational rows scoped by `hotel_id` where applicable.
+- **Persistence:** application code uses Spring `JdbcTemplate` with explicit SQL. Flyway migrations define the schema; there are no JPA entities or Hibernate-managed DDL in the MVP.
 - **PKs:** UUID (application-assigned) — avoids DB extensions.
 - **Time:** `TIMESTAMPTZ` in UTC; JVM `-Duser.timezone=UTC`.  
 - **Naming:** snake_case table/column names; singular table names.
