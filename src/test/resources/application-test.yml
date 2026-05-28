@@ -1,6 +1,8 @@
 spring:
   application:
     name: reshub-test
+  jpa:
+    open-in-view: false
 
 logging:
   level:

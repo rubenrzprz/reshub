@@ -46,6 +46,7 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 | 🧱 **Framework**  | Spring Boot 3                             |
 | 🧷 **Build**      | Maven                                     |
 | 🗄️ **Database**  | PostgreSQL 16                             |
+| 🧾 **Persistence**| Spring Data JPA + targeted JdbcTemplate  |
 | 🔁 **Migrations** | Flyway                                    |
 | 🧪 **Testing**    | JUnit 5, Spring Boot Test, Testcontainers |
 | 📚 **API Docs**   | OpenAPI (springdoc)                       |
@@ -58,6 +59,7 @@ See the full domain & data model in **[📐 Architecture](docs/Architecture.md)*
 High-level overview of the domain & data model. For the full spec, see **[docs/Architecture.md](docs/Architecture.md)**.
 
 - **Tenancy:** single DB; entities scoped by `hotel_id` where applicable.
+- **Persistence:** Spring Data JPA for core aggregate commands/lookups; explicit `JdbcTemplate` SQL for role-scoped list/export queries.
 - **Core entities:** `hotel`, `agency`, `app_user`, `room_type`, `room_type_channel_map`, `reservation`, `reservation_comment`.
 - **Reservations:** lifecycle `NEW → CONFIRMED → CANCELLED | NOSHOW`; never delete (use status + `cancelled_at`).
 - **Lifecycle guardrails:** terminal reservations (`CANCELLED`, `NOSHOW`) are immutable.
